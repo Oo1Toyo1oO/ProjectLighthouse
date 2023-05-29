@@ -44,6 +44,8 @@ public static partial class FileHelper
             LbpFileType.Plan => true,
             LbpFileType.Jpeg => true,
             LbpFileType.Png => true,
+            LbpFileType.Mesh => true,
+            LbpFileType.GMaterial => true,
             #if DEBUG
             _ => throw new ArgumentOutOfRangeException(nameof(file), @$"Unhandled file type ({file.FileType}) in FileHelper.IsFileSafe()"),
             #else
