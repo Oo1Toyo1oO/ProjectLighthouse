@@ -50,6 +50,8 @@ public partial class FileHelper
             "ADSb" => LbpFileType.Adventure,
             "PLNb" => LbpFileType.Plan,
             "QSTb" => LbpFileType.Quest,
+            "MSHb" => LbpFileType.Mesh,
+            "GMTb" => LbpFileType.GMaterial,
             "CHKb" => LbpFileType.StreamingChunk,
             _ => readAlternateHeader(reader),
         };
