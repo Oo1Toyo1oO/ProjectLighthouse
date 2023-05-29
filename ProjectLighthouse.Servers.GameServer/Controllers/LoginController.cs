@@ -1,13 +1,15 @@
 #nullable enable
 using System.Net;
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.Match.Rooms;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Tickets;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,9 +20,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers;
 [Produces("text/xml")]
 public class LoginController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public LoginController(Database database)
+    public LoginController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -28,9 +30,7 @@ public class LoginController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Login()
     {
-        MemoryStream ms = new();
-        await this.Request.Body.CopyToAsync(ms);
-        byte[] loginData = ms.ToArray();
+        byte[] loginData = await this.Request.BodyReader.ReadAllAsync();
 
         NPTicket? npTicket;
         try
@@ -62,12 +62,12 @@ public class LoginController : ControllerBase
         if (username == null)
         {
             Logger.Warn("Unable to determine username, rejecting login", LogArea.Login);
-            return this.StatusCode(403, "");
+            return this.Forbid();
         }
 
         await this.database.RemoveExpiredTokens();
 
-        User? user;
+        UserEntity? user;
 
         switch (npTicket.Platform)
         {
@@ -89,7 +89,7 @@ public class LoginController : ControllerBase
         if (user == null)
         {
             // Check if there is an account with that username already 
-            User? targetUsername = await this.database.Users.FirstOrDefaultAsync(u => u.Username == npTicket.Username);
+            UserEntity? targetUsername = await this.database.Users.FirstOrDefaultAsync(u => u.Username == npTicket.Username);
             if (targetUsername != null)
             {
                 ulong targetPlatform = npTicket.Platform == Platform.RPCS3
@@ -100,7 +100,7 @@ public class LoginController : ControllerBase
                 if (targetPlatform != 0)
                 {
                     Logger.Warn($"New user tried to login but their name is already taken, username={username}", LogArea.Login);
-                    return this.StatusCode(403, "");
+                    return this.Forbid();
                 }
 
                 // if there is already a pending link request don't create another
@@ -109,9 +109,9 @@ public class LoginController : ControllerBase
                     p.PlatformId == npTicket.UserId &&
                     p.UserId == targetUsername.UserId);
 
-                if (linkAttemptExists) return this.StatusCode(403, "");
+                if (linkAttemptExists) return this.Forbid();
 
-                PlatformLinkAttempt linkAttempt = new()
+                PlatformLinkAttemptEntity linkAttempt = new()
                 {
                     Platform = npTicket.Platform,
                     UserId = targetUsername.UserId,
@@ -122,13 +122,13 @@ public class LoginController : ControllerBase
                 this.database.PlatformLinkAttempts.Add(linkAttempt);
                 await this.database.SaveChangesAsync();
                 Logger.Success($"User '{npTicket.Username}' tried to login but platform isn't linked, platform={npTicket.Platform}", LogArea.Login);
-                return this.StatusCode(403, "");
+                return this.Forbid();
             }
 
             if (!ServerConfiguration.Instance.Authentication.AutomaticAccountCreation)
             {
                 Logger.Warn($"Unknown user tried to connect username={username}", LogArea.Login);
-                return this.StatusCode(403, "");
+                return this.Forbid();
             }
             // create account for user if they don't exist
             user = await this.database.CreateUser(username, "$");
@@ -136,7 +136,20 @@ public class LoginController : ControllerBase
             user.LinkedRpcnId = npTicket.Platform == Platform.RPCS3 ? npTicket.UserId : 0;
             user.LinkedPsnId = npTicket.Platform != Platform.RPCS3 ? npTicket.UserId : 0;
             await this.database.SaveChangesAsync();
-                
+
+            if (DiscordConfiguration.Instance.DiscordIntegrationEnabled)
+            {
+                string registrationAnnouncementMsg = DiscordConfiguration.Instance.RegistrationAnnouncement
+                    .Replace("%user", username)
+                    .Replace("%id", user.UserId.ToString())
+                    .Replace("%instance", ServerConfiguration.Instance.Customization.ServerName)
+                    .Replace("%platform", npTicket.Platform.ToString())
+                    .Replace(@"\n", "\n");
+                await WebhookHelper.SendWebhook(title: "A new user has registered!",
+                    description: registrationAnnouncementMsg,
+                    dest: WebhookHelper.WebhookDestination.Registration);
+            }
+
             Logger.Success($"Created new user for {username}, platform={npTicket.Platform}", LogArea.Login);
         }
         // automatically change username if it doesn't match
@@ -147,11 +160,11 @@ public class LoginController : ControllerBase
             {
                 Logger.Warn($"{npTicket.Platform} user changed their name to a name that is already taken," +
                             $" oldName='{user.Username}', newName='{npTicket.Username}'", LogArea.Login);
-                return this.StatusCode(403, "");
+                return this.Forbid();
             }
             Logger.Info($"User's username has changed, old='{user.Username}', new='{npTicket.Username}', platform={npTicket.Platform}", LogArea.Login);
             user.Username = username;
-            this.database.PlatformLinkAttempts.RemoveWhere(p => p.UserId == user.UserId);
+            await this.database.PlatformLinkAttempts.RemoveWhere(p => p.UserId == user.UserId);
             // unlink other platforms because the names no longer match
             if (npTicket.Platform == Platform.RPCS3)
                 user.LinkedPsnId = 0;
@@ -161,26 +174,26 @@ public class LoginController : ControllerBase
             await this.database.SaveChangesAsync();
         }
 
-        GameToken? token = await this.database.GameTokens.Include(t => t.User)
+        GameTokenEntity? token = await this.database.GameTokens.Include(t => t.User)
             .FirstOrDefaultAsync(t => t.UserLocation == ipAddress && t.User.Username == npTicket.Username && t.TicketHash == npTicket.TicketHash);
 
         if (token != null)
         {
             Logger.Warn($"Rejecting duplicate ticket from {username}", LogArea.Login);
-            return this.StatusCode(403, "");
+            return this.Forbid();
         }
 
         token = await this.database.AuthenticateUser(user, npTicket, ipAddress);
         if (token == null)
         {
             Logger.Warn($"Unable to find/generate a token for username {npTicket.Username}", LogArea.Login);
-            return this.StatusCode(403, "");
+            return this.Forbid();
         }
 
         if (user.IsBanned)
         {
             Logger.Error($"User {npTicket.Username} tried to login but is banned", LogArea.Login);
-            return this.StatusCode(403, "");
+            return this.Forbid();
         }
 
         Logger.Success($"Successfully logged in user {user.Username} as {token.GameVersion} client", LogArea.Login);
@@ -199,7 +212,7 @@ public class LoginController : ControllerBase
                 AuthTicket = "MM_AUTH=" + token.UserToken,
                 ServerBrand = VersionHelper.EnvVer,
                 TitleStorageUrl = ServerConfiguration.Instance.GameApiExternalUrl,
-            }.Serialize()
+            }
         );
     }
 }

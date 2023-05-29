@@ -1,11 +1,11 @@
 @page "/user/{userId:int}"
 @using System.Web
-@using LBPUnion.ProjectLighthouse.Administration
 @using LBPUnion.ProjectLighthouse.Extensions
-@using LBPUnion.ProjectLighthouse.Levels
 @using LBPUnion.ProjectLighthouse.Localization.StringLists
-@using LBPUnion.ProjectLighthouse.PlayerData
 @using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
+@using LBPUnion.ProjectLighthouse.Types.Entities.Level
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
+@using LBPUnion.ProjectLighthouse.Types.Moderation.Cases
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.UserPage
 
 @{
@@ -23,18 +23,18 @@
 @if (Model.ProfileUser.IsBanned)
 {
     <div class="ui inverted red segment">
-        <h2>User is currently banned!</h2>
+        <h3 style="margin-bottom:3px;"><i class="ban icon"></i> This user is currently banned.</h3>
         @if (Model.User != null && Model.User.IsModerator)
         {
             <b>Reason:</b>
             <span>"@Model.ProfileUser.BannedReason"</span>
             <p>
-                <i>Note: Only you and other moderators may view the ban reason.</i>
+                <i>Only you and other moderators may view the ban reason.</i>
             </p>
         }
-        else
+        else 
         {
-            <p>For shame...</p>
+            <p>Users who engage in inappropriate, offensive, or violent actions will be moderated. Be sure to follow the rules!</p>
         }
     </div>
 }
@@ -61,6 +61,20 @@
         <br>
         @if (Model.ProfileUser != Model.User && Model.User != null)
         {
+            if (!Model.IsProfileUserBlocked)
+            {
+                <a class="ui red button" href="/user/@Model.ProfileUser.UserId/block">
+                    <i class="user alternate slash icon"></i>
+                    <span>Block</span>
+                </a>
+            }
+            else
+            {
+                <a class="ui black button" href="/user/@Model.ProfileUser.UserId/unblock">
+                    <i class="user alternate icon"></i>
+                    <span>Unblock</span>
+                </a>
+            }
             if (!Model.IsProfileUserHearted)
             {
                 <a class="ui pink button" href="/user/@Model.ProfileUser.UserId/heart">
@@ -164,15 +178,24 @@
     }
     <div class="@divLength wide stretched column">
         <div class="lh-content" id="lh-comments">
-            @await Html.PartialAsync("Partials/CommentsPartial", new ViewDataDictionary(ViewData.WithLang(language).WithTime(timeZone))
-                   { {"PageOwner", Model.ProfileUser.UserId}, })
+            @if (Model.ProfileUser.IsBanned)
+            {
+                <div class="ui yellow segment" id="comments">
+                    <p><i>Comments are disabled because the user is banned.</i></p>
+                </div>
+            }
+            else
+            {
+                @await Html.PartialAsync("Partials/CommentsPartial", new ViewDataDictionary(ViewData.WithLang(language).WithTime(timeZone))
+                    { {"PageOwner", Model.ProfileUser.UserId}, })
+            }
         </div>
         <div class="lh-content" id="lh-photos">
             <div class="ui purple segment" id="photos">
                 @if (Model.Photos != null && Model.Photos.Count != 0)
                 {
                     <div class="ui center aligned grid">
-                        @foreach (Photo photo in Model.Photos)
+                        @foreach (PhotoEntity photo in Model.Photos)
                         {
                             string width = isMobile ? "sixteen" : "eight";
                             bool canDelete = Model.User != null && (Model.User.IsModerator || Model.User.UserId == photo.CreatorId);
@@ -198,7 +221,7 @@
                 {
                     <p>This user hasn't published any levels</p>
                 }
-                @foreach (Slot slot in Model.Slots ?? new List<Slot>())
+                @foreach (SlotEntity slot in Model.Slots ?? new List<SlotEntity>())
                 {
                     <div class="ui segment">
                         @await slot.ToHtml(Html, ViewData, Model.User, $"~/user/{Model.ProfileUser.UserId}#levels", language, timeZone, isMobile, true)
@@ -223,7 +246,7 @@
                     {
                         <p>You have hearted @(Model.HeartedSlots?.Count) levels</p>
                     }
-                    @foreach (Slot slot in Model.HeartedSlots ?? new List<Slot>())
+                    @foreach (SlotEntity slot in Model.HeartedSlots ?? new List<SlotEntity>())
                     {
                         <div class="ui segment">
                             @await slot.ToHtml(Html, ViewData, Model.User, $"~/user/{Model.ProfileUser.UserId}#hearted", language, timeZone, isMobile, true)
@@ -241,7 +264,7 @@
                     {
                         <p>There are @(Model.QueuedSlots?.Count) levels in your queue</p>
                     }
-                    @foreach (Slot slot in Model.QueuedSlots ?? new List<Slot>())
+                    @foreach (SlotEntity slot in Model.QueuedSlots ?? new List<SlotEntity>())
                     {
                         <div class="ui segment">
                             @await slot.ToHtml(Html, ViewData, Model.User, $"~/user/{Model.ProfileUser.UserId}#queued", language, timeZone, isMobile, true)

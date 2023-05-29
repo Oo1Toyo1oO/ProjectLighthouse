@@ -1,8 +1,11 @@
 #nullable enable
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData;
+using LBPUnion.ProjectLighthouse.Types.Entities.Interaction;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,9 +18,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers.Matching;
 [Produces("text/xml")]
 public class EnterLevelController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public EnterLevelController(Database database)
+    public EnterLevelController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -25,18 +28,18 @@ public class EnterLevelController : ControllerBase
     [HttpPost("play/{slotType}/{slotId:int}")]
     public async Task<IActionResult> PlayLevel(string slotType, int slotId)
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
         if (SlotHelper.IsTypeInvalid(slotType)) return this.BadRequest();
 
         // don't count plays for developer slots
         if (slotType == "developer") return this.Ok();
 
-        Slot? slot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slotId);
-        if (slot == null) return this.StatusCode(403, "");
+        SlotEntity? slot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slotId);
+        if (slot == null) return this.BadRequest();
 
-        IQueryable<VisitedLevel> visited = this.database.VisitedLevels.Where(s => s.SlotId == slotId && s.UserId == token.UserId);
-        VisitedLevel? v;
+        IQueryable<VisitedLevelEntity> visited = this.database.VisitedLevels.Where(s => s.SlotId == slotId && s.UserId == token.UserId);
+        VisitedLevelEntity? v;
         if (!visited.Any())
         {
             switch (token.GameVersion)
@@ -54,7 +57,7 @@ public class EnterLevelController : ControllerBase
                 default: return this.BadRequest();
             }
 
-            v = new VisitedLevel
+            v = new VisitedLevelEntity
             {
                 SlotId = slotId,
                 UserId = token.UserId,
@@ -95,22 +98,22 @@ public class EnterLevelController : ControllerBase
     [HttpPost("enterLevel/{slotType}/{slotId:int}")]
     public async Task<IActionResult> EnterLevel(string slotType, int slotId)
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
         if (SlotHelper.IsTypeInvalid(slotType)) return this.BadRequest();
 
         if (slotType == "developer") return this.Ok();
 
-        Slot? slot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slotId);
+        SlotEntity? slot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slotId);
         if (slot == null) return this.NotFound();
 
-        IQueryable<VisitedLevel> visited = this.database.VisitedLevels.Where(s => s.SlotId == slotId && s.UserId == token.UserId);
-        VisitedLevel? v;
+        IQueryable<VisitedLevelEntity> visited = this.database.VisitedLevels.Where(s => s.SlotId == slotId && s.UserId == token.UserId);
+        VisitedLevelEntity? v;
         if (!visited.Any())
         {
             slot.PlaysLBP1Unique++;
 
-            v = new VisitedLevel
+            v = new VisitedLevelEntity
             {
                 SlotId = slotId,
                 UserId = token.UserId,

@@ -1,5 +1,5 @@
 @page "/authentication"
-@using LBPUnion.ProjectLighthouse.PlayerData
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.ExternalAuth.AuthenticationPage
 
 @{
@@ -22,7 +22,7 @@ else
     }
 }
 
-@foreach (PlatformLinkAttempt authAttempt in Model.LinkAttempts)
+@foreach (PlatformLinkAttemptEntity authAttempt in Model.LinkAttempts)
 {
     DateTimeOffset timestamp = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeMilliseconds(authAttempt.Timestamp), timeZoneInfo);
     <div class="ui red segment">

@@ -1,11 +1,13 @@
 #nullable enable
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.PlayerData;
+using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
+using LBPUnion.ProjectLighthouse.Servers.API.Responses;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
-// ReSharper disable RouteTemplates.ActionRoutePrefixCanBeExtractedToControllerRoute
 
 namespace LBPUnion.ProjectLighthouse.Servers.API.Controllers;
 
@@ -14,9 +16,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.API.Controllers;
 /// </summary>
 public class UserEndpoints : ApiEndpointController
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public UserEndpoints(Database database)
+    public UserEndpoints(DatabaseContext database)
     {
         this.database = database;
     }
@@ -29,25 +31,48 @@ public class UserEndpoints : ApiEndpointController
     /// <response code="200">The user, if successful.</response>
     /// <response code="404">The user could not be found.</response>
     [HttpGet("user/{id:int}")]
-    [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiUser), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUser(int id)
     {
-        User? user = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        UserEntity? user = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (user == null) return this.NotFound();
 
-        return this.Ok(user);
+        return this.Ok(ApiUser.CreateFromEntity(user));
     }
 
     [HttpGet("username/{username}")]
-    [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiUser), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUser(string username)
     {
-        User? user = await this.database.Users.FirstOrDefaultAsync(u => u.Username == username);
+        UserEntity? user = await this.database.Users.FirstOrDefaultAsync(u => u.Username == username);
         if (user == null) return this.NotFound();
 
-        return this.Ok(user);
+        return this.Ok(ApiUser.CreateFromEntity(user));
+    }
+
+    /// <summary>
+    /// Searches for the user based on the query
+    /// </summary>
+    /// <param name="query">The search query</param>
+    /// <returns>A list of users</returns>
+    /// <response code="200">The list of users, if any were found</response>
+    /// <response code="404">No users matched the query</response>
+    [HttpGet("search/user")]
+    [ProducesResponseType(typeof(ApiUser), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SearchUsers(string query)
+    {
+        List<ApiUser> users = (await this.database.Users
+            .Where(u => u.PermissionLevel != PermissionLevel.Banned && u.Username.Contains(query))
+            .Where(u => u.ProfileVisibility == PrivacyType.All) // TODO: change check for when user is logged in
+            .OrderByDescending(b => b.UserId)
+            .Take(20)
+            .ToListAsync()).ToSerializableList(ApiUser.CreateFromEntity);
+        if (!users.Any()) return this.NotFound();
+
+        return this.Ok(users);
     }
 
     /// <summary>
@@ -58,7 +83,7 @@ public class UserEndpoints : ApiEndpointController
     /// <response code="200">The user's status, if successful.</response>
     /// <response code="404">The user could not be found.</response>
     [HttpGet("user/{id:int}/status")]
-    [ProducesResponseType(typeof(UserStatus), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiUser), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetUserStatus(int id)
     {
@@ -79,8 +104,8 @@ public class UserEndpoints : ApiEndpointController
 
         string authToken = authHeader[(authHeader.IndexOf(' ') + 1)..];
 
-        APIKey? apiKey = await this.database.APIKeys.FirstOrDefaultAsync(k => k.Key == authToken);
-        if (apiKey == null) return this.StatusCode(403, null);
+        ApiKeyEntity? apiKey = await this.database.APIKeys.FirstOrDefaultAsync(k => k.Key == authToken);
+        if (apiKey == null) return this.StatusCode(403);
 
         if (!string.IsNullOrWhiteSpace(username))
         {
@@ -88,7 +113,7 @@ public class UserEndpoints : ApiEndpointController
             if (userExists) return this.BadRequest();
         }
 
-        RegistrationToken token = new()
+        RegistrationTokenEntity token = new()
         {
             Created = DateTime.Now,
             Token = CryptoHelper.GenerateAuthToken(),

@@ -1,7 +1,8 @@
 #nullable enable
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,9 +12,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Controllers.ExternalAuth;
 [Route("/authentication")]
 public class AuthenticationController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public AuthenticationController(Database database)
+    public AuthenticationController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -21,7 +22,7 @@ public class AuthenticationController : ControllerBase
     [HttpGet("unlink/{platform}")]
     public async Task<IActionResult> UnlinkPlatform(string platform)
     {
-        User? user = this.database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("~/login");
 
         Platform[] invalidTokens;
@@ -37,8 +38,7 @@ public class AuthenticationController : ControllerBase
             invalidTokens = new[] { Platform.RPCS3, };
         }
 
-        this.database.GameTokens.RemoveWhere(t => t.UserId == user.UserId && invalidTokens.Contains(t.Platform));
-
+        await this.database.GameTokens.RemoveWhere(t => t.UserId == user.UserId && invalidTokens.Contains(t.Platform));
         await this.database.SaveChangesAsync();
 
         return this.Redirect("~/authentication");
@@ -47,10 +47,10 @@ public class AuthenticationController : ControllerBase
     [HttpGet("approve/{id:int}")]
     public async Task<IActionResult> Approve(int id)
     {
-        User? user = this.database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("/login");
 
-        PlatformLinkAttempt? linkAttempt = await this.database.PlatformLinkAttempts
+        PlatformLinkAttemptEntity? linkAttempt = await this.database.PlatformLinkAttempts
             .FirstOrDefaultAsync(l => l.PlatformLinkAttemptId == id);
         if (linkAttempt == null) return this.NotFound();
 
@@ -75,10 +75,10 @@ public class AuthenticationController : ControllerBase
     [HttpGet("deny/{id:int}")]
     public async Task<IActionResult> Deny(int id)
     {
-        User? user = this.database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("/login");
 
-        PlatformLinkAttempt? linkAttempt = await this.database.PlatformLinkAttempts
+        PlatformLinkAttemptEntity? linkAttempt = await this.database.PlatformLinkAttempts
             .FirstOrDefaultAsync(l => l.PlatformLinkAttemptId == id);
         if (linkAttempt == null) return this.NotFound();
 

@@ -1,10 +1,13 @@
 #nullable enable
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Mail;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +20,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers;
 [Produces("text/plain")]
 public class MessageController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
     private const string license = @"
 This program is free software: you can redistribute it and/or modify
@@ -33,7 +36,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.";
 
-    public MessageController(Database database)
+    public MessageController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -44,7 +47,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.";
     [HttpGet("announce")]
     public async Task<IActionResult> Announce()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
         string username = await this.database.UsernameFromGameToken(token);
 
@@ -77,52 +80,35 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.";
     ///     The response sent is the text that will appear in-game.
     /// </summary>
     [HttpPost("filter")]
-    public async Task<IActionResult> Filter()
+    public async Task<IActionResult> Filter(IMailService mailService)
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        string message = await new StreamReader(this.Request.Body).ReadToEndAsync();
+        string message = await this.ReadBodyAsync();
 
-        if (message.StartsWith("/setemail "))
+        if (message.StartsWith("/setemail ") && ServerConfiguration.Instance.Mail.MailEnabled)
         {
             string email = message[(message.IndexOf(" ", StringComparison.Ordinal)+1)..];
             if (!SanitizationHelper.IsValidEmail(email)) return this.Ok();
 
             if (await this.database.Users.AnyAsync(u => u.EmailAddress == email)) return this.Ok();
 
-            User? user = await this.database.UserFromGameToken(token);
-            if (user == null || user.EmailAddress != null) return this.Ok();
-
-            PasswordResetToken resetToken = new()
-            {
-                Created = DateTime.Now,
-                UserId = user.UserId,
-                ResetToken = CryptoHelper.GenerateAuthToken(),
-            };
-
-            string messageBody = $"Hello, {user.Username}.\n\n" +
-                                 "A request to set your account's password was issued. If this wasn't you, this can probably be ignored.\n\n" +
-                                 $"If this was you, your {ServerConfiguration.Instance.Customization.ServerName} password can be set at the following link:\n" +
-                                 $"{ServerConfiguration.Instance.ExternalUrl}/passwordReset?token={resetToken.ResetToken}";
-
-            SMTPHelper.SendEmail(email, $"Project Lighthouse Password Setup Request for {user.Username}", messageBody);
-
-            this.database.PasswordResetTokens.Add(resetToken);
+            UserEntity? user = await this.database.UserFromGameToken(token);
+            if (user == null || user.EmailAddressVerified) return this.Ok();
 
             user.EmailAddress = email;
-            user.EmailAddressVerified = true;
-            await this.database.SaveChangesAsync();
+            await SMTPHelper.SendVerificationEmail(this.database, mailService, user);
 
             return this.Ok();
         }
 
-        string scannedText = CensorHelper.ScanMessage(message);
+        string filteredText = CensorHelper.FilterMessage(message);
 
         string username = await this.database.UsernameFromGameToken(token);
 
-        if (ServerConfiguration.Instance.LogChatFiltering) 
-          Logger.Info($"{username}: {message} / {scannedText}", LogArea.Filter);
+        if (ServerConfiguration.Instance.LogChatFiltering)
+            Logger.Info($"{username}: {message} / {filteredText}", LogArea.Filter);
 
-        return this.Ok(scannedText);
+        return this.Ok(filteredText);
     }
 }

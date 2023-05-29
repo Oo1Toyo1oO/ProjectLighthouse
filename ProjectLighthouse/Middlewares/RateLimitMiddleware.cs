@@ -7,22 +7,24 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Configuration.ConfigurationCategories;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
+using LBPUnion.ProjectLighthouse.Types.Logging;
 using Microsoft.AspNetCore.Http;
 
 namespace LBPUnion.ProjectLighthouse.Middlewares;
 
-public class RateLimitMiddleware : MiddlewareDBContext
+public class RateLimitMiddleware : Middleware
 {
 
-    // (userId, requestData)
-    private static readonly ConcurrentDictionary<IPAddress, List<LighthouseRequest?>> recentRequests = new();
+    // (ipAddress, requestData)
+    private static readonly ConcurrentDictionary<IPAddress, ConcurrentQueue<LighthouseRequest?>> recentRequests = new();
 
     public RateLimitMiddleware(RequestDelegate next) : base(next)
     { }
 
-    public override async Task InvokeAsync(HttpContext ctx, Database database)
+    public override async Task InvokeAsync(HttpContext ctx)
     {
         // We only want to rate limit POST requests
         if (ctx.Request.Method != "POST")
@@ -49,12 +51,17 @@ public class RateLimitMiddleware : MiddlewareDBContext
 
         RemoveExpiredEntries();
 
-        if (GetNumRequestsForPath(address, path) >= GetMaxNumRequests(options))
+        if (GetNumRequestsForPath(address, path, options) >= GetMaxNumRequests(options))
         {
-            Logger.Info($"Request limit reached for {address.ToString()} ({ctx.Request.Path})", LogArea.RateLimit);
-            long nextExpiration = recentRequests[address][0]?.Expiration ?? TimeHelper.TimestampMillis;
-            ctx.Response.Headers.Add("Retry-After", "" + Math.Ceiling((nextExpiration - TimeHelper.TimestampMillis) / 1000f));
+            Logger.Info($"Request limit reached for {address} ({ctx.Request.Path})", LogArea.RateLimit);
+            recentRequests[address].TryPeek(out LighthouseRequest? request);
+            long nextExpiration = request?.Expiration ?? TimeHelper.TimestampMillis;
+            ctx.Response.Headers.TryAdd("Retry-After", "" + Math.Ceiling((nextExpiration - TimeHelper.TimestampMillis) / 1000f));
             ctx.Response.StatusCode = 429;
+            await ctx.Response.WriteAsync(
+                "<html><head><title>Rate limit reached</title><style>html{font-family: Tahoma, Verdana, Arial, sans-serif;}</style></head>" +
+                "<h1>You have reached the rate limit</h1>" +
+                $"<p>Try again in {ctx.Response.Headers.RetryAfter} seconds</html>");
             return;
         }
 
@@ -97,42 +104,57 @@ public class RateLimitMiddleware : MiddlewareDBContext
 
     private static void LogRequest(IPAddress address, PathString path, RateLimitOptions? options)
     {
-        recentRequests.GetOrAdd(address, new List<LighthouseRequest?>()).Add(LighthouseRequest.Create(path, GetRequestInterval(options) * 1000 + TimeHelper.TimestampMillis));
+        LighthouseRequest request = LighthouseRequest.Create(path, GetRequestInterval(options) * 1000 + TimeHelper.TimestampMillis, options);
+        recentRequests.GetOrAdd(address, new ConcurrentQueue<LighthouseRequest?>()).Enqueue(request);
     }
 
     private static void RemoveExpiredEntries()
     {
-        for (int i = recentRequests.Count - 1; i >= 0; i--)
+        foreach((IPAddress address, ConcurrentQueue<LighthouseRequest?> list) in recentRequests)
         {
-            IPAddress address = recentRequests.ElementAt(i).Key;
-            bool exists = recentRequests.TryGetValue(address, out List<LighthouseRequest?>? requests); 
-            if (!exists || requests == null || recentRequests[address].Count == 0)
+            if (list.IsEmpty)
             {
                 recentRequests.TryRemove(address, out _);
                 continue;
             }
-            requests.RemoveAll(r => TimeHelper.TimestampMillis >= (r?.Expiration ?? TimeHelper.TimestampMillis));
+
+            while (list.TryPeek(out LighthouseRequest? request))
+            {
+                if (TimeHelper.TimestampMillis < (request?.Expiration ?? TimeHelper.TimestampMillis)) 
+                    break;
+
+                list.TryDequeue(out _);
+            }
         }
     }
 
     private static string RemoveTrailingSlash(string s) => s.TrimEnd('/').TrimEnd('\\');
 
-    private static int GetNumRequestsForPath(IPAddress address, PathString path)
+    private static int GetNumRequestsForPath(IPAddress address, PathString path, RateLimitOptions? options)
     {
-        return !recentRequests.ContainsKey(address) ? 0 : recentRequests[address].Count(r => (r?.Path ?? "") == path);
+        if (!recentRequests.ContainsKey(address)) return 0;
+        int? optionsHash = options?.GetHashCode();
+        // If there are no custom options then count requests based on exact url matches, otherwise use regex matching
+        return options switch
+        {
+            null => recentRequests[address].Count(r => (r?.Path ?? "") == path),
+            _ => recentRequests[address].Count(r => r?.OptionsHash == optionsHash),
+        };
     }
 
     private class LighthouseRequest
     {
         public PathString Path { get; private init; } = "";
+        public int? OptionsHash { get; private init; }
         public long Expiration { get; private init; }
 
-        public static LighthouseRequest Create(PathString path, long expiration)
+        public static LighthouseRequest Create(PathString path, long expiration, RateLimitOptions? options = null)
         {
             LighthouseRequest request = new()
             {
                 Path = path,
                 Expiration = expiration,
+                OptionsHash = options?.GetHashCode(),
             };
             return request;
         }

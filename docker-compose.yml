@@ -1,4 +1,4 @@
-version: '3'
+version: '3.4'
 volumes:
   database:
   redis:
@@ -16,6 +16,7 @@ services:
       test: wget --spider -t1 -nv http://localhost:10061/LITTLEBIGPLANETPS3_XML/status || exit 1
       timeout: 10s
       retries: 5
+      start_period: 60s
     depends_on:
       db:
         condition: service_healthy
@@ -23,6 +24,7 @@ services:
         condition: service_started
     volumes:
       - "./data:/lighthouse/data:z"
+      - "./data/.aspnet:/lighthouse/.aspnet:z"
   website:
     image: lighthouse:latest
     container_name: website
@@ -35,15 +37,15 @@ services:
       test: wget --spider -t1 -nv http://localhost:10060/status || exit 1
       timeout: 10s
       retries: 5
+      start_period: 60s
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_started
-      gameserver:
-        condition: service_healthy
     volumes:
       - "./data:/lighthouse/data:z"
+      - "./data/.aspnet:/lighthouse/.aspnet:z"
   api:
     image: lighthouse:latest
     container_name: api
@@ -56,35 +58,32 @@ services:
       test: wget --spider -t1 -nv http://localhost:10062/api/v1/status || exit 1
       timeout: 10s
       retries: 5
+      start_period: 60s
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_started
-      gameserver:
-        condition: service_healthy
     volumes:
       - "./data:/lighthouse/data:z"
+      - "./data/.aspnet:/lighthouse/.aspnet:z"
   db:
     image: mariadb
     container_name: db
     restart: unless-stopped
-    ports:
-      - "3306:3306"
     environment:
       MARIADB_ROOT_PASSWORD: lighthouse
       MARIADB_DATABASE: lighthouse
     healthcheck:
       test: "/usr/bin/mysql --user=root --password=lighthouse --execute \"SHOW DATABASES;\""
-      timeout: 20s
-      retries: 10
+      timeout: 10s
+      interval: 5s
+      retries: 5
     volumes:
       - "database:/var/lib/mysql"
   redis:
     image: redis/redis-stack-server
     container_name: redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - "redis:/var/lib/redis"

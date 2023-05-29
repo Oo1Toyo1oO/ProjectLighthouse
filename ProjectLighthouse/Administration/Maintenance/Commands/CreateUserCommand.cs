@@ -1,15 +1,18 @@
 ﻿#nullable enable
 using System.Threading.Tasks;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Maintenance;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Administration.Maintenance.Commands;
 
 public class CreateUserCommand : ICommand
 {
-    private readonly Database _database = new();
+    private readonly DatabaseContext _database = DatabaseContext.CreateNewInstance();
 
     public async Task Run(string[] args, Logger logger)
     {
@@ -18,7 +21,7 @@ public class CreateUserCommand : ICommand
 
         password = CryptoHelper.Sha256Hash(password);
 
-        User? user = await this._database.Users.FirstOrDefaultAsync(u => u.Username == onlineId);
+        UserEntity? user = await this._database.Users.FirstOrDefaultAsync(u => u.Username == onlineId);
         if (user == null)
         {
             user = await this._database.CreateUser(onlineId, CryptoHelper.BCryptHash(password));

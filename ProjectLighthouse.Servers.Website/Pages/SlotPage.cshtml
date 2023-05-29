@@ -1,11 +1,13 @@
 @page "/slot/{id:int}"
 @using System.Web
-@using LBPUnion.ProjectLighthouse.Administration
+@using LBPUnion.ProjectLighthouse.Database
 @using LBPUnion.ProjectLighthouse.Extensions
 @using LBPUnion.ProjectLighthouse.Helpers
 @using LBPUnion.ProjectLighthouse.Localization.StringLists
-@using LBPUnion.ProjectLighthouse.PlayerData
 @using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
+@using LBPUnion.ProjectLighthouse.Types.Moderation.Cases
+@using LBPUnion.ProjectLighthouse.Types.Users
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.SlotPage
 
 @{
@@ -53,13 +55,11 @@
                 string[] authorLabels;
                 if (Model.Slot?.GameVersion == GameVersion.LittleBigPlanet1)
                 {
-                    authorLabels = Model.Slot?.LevelTags ?? Array.Empty<string>();
+                    authorLabels = Model.Slot.LevelTags(DatabaseContext.CreateNewInstance());
                 }
                 else
                 {
-                    authorLabels = Model.Slot?.AuthorLabels.Split(",") ?? Array.Empty<string>();
-                    // Split() returns an array with an empty character for some reason
-                    if (authorLabels.Length == 1) authorLabels = Array.Empty<string>();
+                    authorLabels = Model.Slot?.AuthorLabels.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
                 }
                 if (authorLabels.Length == 0)
                 {
@@ -120,7 +120,7 @@
                 @if (Model.Photos.Count != 0)
                 {
                     <div class="ui center aligned grid">
-                        @foreach (Photo photo in Model.Photos)
+                        @foreach (PhotoEntity photo in Model.Photos)
                         {
                             string width = isMobile ? "sixteen" : "eight";
                             bool canDelete = Model.User != null && (Model.User.IsModerator || Model.User.UserId == photo.CreatorId);

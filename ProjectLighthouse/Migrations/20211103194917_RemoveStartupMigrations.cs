@@ -1,16 +1,17 @@
 ﻿using LBPUnion.ProjectLighthouse.Helpers;
 using Microsoft.EntityFrameworkCore.Migrations;
 using LBPUnion.ProjectLighthouse;
+using LBPUnion.ProjectLighthouse.Database;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 namespace ProjectLighthouse.Migrations
 {
-    [DbContext(typeof(Database))]
+    [DbContext(typeof(DatabaseContext))]
     [Migration("20211103194917_RemoveStartupMigrations")]
     public partial class RemoveStartupMigrations : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            long timestamp = TimeHelper.UnixTimeMilliseconds();
+            long timestamp = TimeHelper.TimestampMillis;
             
             // Fix timestamps
             migrationBuilder.Sql($"UPDATE Slots SET FirstUploaded = {timestamp} WHERE FirstUploaded = 0");

@@ -1,10 +1,12 @@
 #nullable enable
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
-using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.Serialization;
+using LBPUnion.ProjectLighthouse.Servers.GameServer.Types.Users;
 using LBPUnion.ProjectLighthouse.StorableLists.Stores;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Serialization;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +16,12 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers;
 [ApiController]
 [Authorize]
 [Route("LITTLEBIGPLANETPS3_XML/")]
+[Produces("text/xml")]
 public class FriendsController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public FriendsController(Database database)
+    public FriendsController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -26,26 +29,24 @@ public class FriendsController : ControllerBase
     [HttpPost("npdata")]
     public async Task<IActionResult> NPData()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
         NPData? npData = await this.DeserializeBody<NPData>();
         if (npData == null) return this.BadRequest();
 
-        SanitizationHelper.SanitizeStringsInClass(npData);
-
-        List<User> friends = new();
-        foreach (string friendName in npData.Friends)
+        List<UserEntity> friends = new();
+        foreach (string friendName in npData.Friends ?? new List<string>())
         {
-            User? friend = await this.database.Users.FirstOrDefaultAsync(u => u.Username == friendName);
+            UserEntity? friend = await this.database.Users.FirstOrDefaultAsync(u => u.Username == friendName);
             if (friend == null) continue;
 
             friends.Add(friend);
         }
 
         List<int> blockedUsers = new();
-        foreach (string blockedUserName in npData.BlockedUsers)
+        foreach (string blockedUserName in npData.BlockedUsers ?? new List<string>())
         {
-            User? blockedUser = await this.database.Users.FirstOrDefaultAsync(u => u.Username == blockedUserName);
+            UserEntity? blockedUser = await this.database.Users.FirstOrDefaultAsync(u => u.Username == blockedUserName);
             if (blockedUser == null) continue;
 
             blockedUsers.Add(blockedUser.UserId);
@@ -58,30 +59,35 @@ public class FriendsController : ControllerBase
 
         UserFriendStore.UpdateFriendData(friendStore);
 
-        string friendsSerialized = friends.Aggregate(string.Empty, (current, user1) => current + LbpSerializer.StringElement("npHandle", user1.Username));
+        List<MinimalUserProfile> minimalFriends =
+            friends.Select(u => new MinimalUserProfile
+            {
+                UserHandle = new NpHandle(u.Username, ""),
+            }).ToList();
 
-        return this.Ok(LbpSerializer.StringElement("npdata", LbpSerializer.StringElement("friends", friendsSerialized)));
+        return this.Ok(new FriendResponse(minimalFriends));
     }
 
     [HttpGet("myFriends")]
     public async Task<IActionResult> MyFriends()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
         UserFriendData? friendStore = UserFriendStore.GetUserFriendData(token.UserId);
 
-        if (friendStore == null)
-            return this.Ok(LbpSerializer.BlankElement("myFriends"));
+        GenericUserResponse<GameUser> response = new("myFriends", new List<GameUser>());
 
-        string friends = "";
+        if (friendStore == null)
+            return this.Ok(response);
+
         foreach (int friendId in friendStore.FriendIds)
         {
-            User? friend = await this.database.Users.Include(u => u.Location).FirstOrDefaultAsync(u => u.UserId == friendId);
+            UserEntity? friend = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == friendId);
             if (friend == null) continue;
 
-            friends += friend.Serialize(token.GameVersion);
+            response.Users.Add(GameUser.CreateFromEntity(friend, token.GameVersion));
         }
 
-        return this.Ok(LbpSerializer.StringElement("myFriends", friends));
+        return this.Ok(response);
     }
 }

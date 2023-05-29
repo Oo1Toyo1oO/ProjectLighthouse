@@ -1,13 +1,18 @@
 #nullable enable
+using System.Diagnostics;
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Files;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.Levels;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.Serialization;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Resources;
+using LBPUnion.ProjectLighthouse.Types.Serialization;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,9 +25,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers.Slots;
 [Produces("text/xml")]
 public class PublishController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public PublishController(Database database)
+    public PublishController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -33,12 +38,12 @@ public class PublishController : ControllerBase
     [HttpPost("startPublish")]
     public async Task<IActionResult> StartPublish()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        User? user = await this.database.UserFromGameToken(token);
-        if (user == null) return this.StatusCode(403, "");
+        UserEntity? user = await this.database.UserFromGameToken(token);
+        if (user == null) return this.Forbid();
 
-        Slot? slot = await this.DeserializeBody<Slot>();
+        GameUserSlot? slot = await this.DeserializeBody<GameUserSlot>();
         if (slot == null)
         {
             Logger.Warn("Rejecting level upload, slot is null", LogArea.Publish);
@@ -51,12 +56,20 @@ public class PublishController : ControllerBase
             return this.BadRequest();
         }
 
-        if (string.IsNullOrEmpty(slot.ResourceCollection)) slot.ResourceCollection = slot.RootLevel;
+        if (slot.Resources?.Length == 0) slot.Resources = new[]{slot.RootLevel,};
+
+        if (slot.Resources == null)
+        {
+            Logger.Warn("Rejecting level upload, resource list is null", LogArea.Publish);
+            return this.BadRequest();
+        }
+
+        int usedSlots = await this.database.Slots.CountAsync(s => s.CreatorId == token.UserId && s.GameVersion == token.GameVersion);
 
         // Republish logic
         if (slot.SlotId != 0)
         {
-            Slot? oldSlot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slot.SlotId);
+            SlotEntity? oldSlot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slot.SlotId);
             if (oldSlot == null)
             {
                 Logger.Warn("Rejecting level republish, could not find old slot", LogArea.Publish);
@@ -68,18 +81,18 @@ public class PublishController : ControllerBase
                 return this.BadRequest();
             }
         }
-        else if (user.GetUsedSlotsForGame(token.GameVersion) > user.EntitledSlots)
+        else if (usedSlots > user.EntitledSlots)
         {
-            return this.StatusCode(403, "");
+            return this.Forbid();
         }
 
-        slot.ResourceCollection += "," + slot.IconHash; // tells LBP to upload icon after we process resources here
+        HashSet<string> resources = new(slot.Resources)
+        {
+            slot.IconHash,
+        };
+        resources = resources.Where(hash => !FileHelper.ResourceExists(hash)).ToHashSet();
 
-        string resources = slot.Resources.Where
-                (hash => !FileHelper.ResourceExists(hash))
-            .Aggregate("", (current, hash) => current + LbpSerializer.StringElement("resource", hash));
-
-        return this.Ok(LbpSerializer.TaggedStringElement("slot", resources, "type", "user"));
+        return this.Ok(new SlotResourceResponse(resources.ToList()));
     }
 
     /// <summary>
@@ -88,12 +101,12 @@ public class PublishController : ControllerBase
     [HttpPost("publish")]
     public async Task<IActionResult> Publish([FromQuery] string? game)
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        User? user = await this.database.UserFromGameToken(token);
-        if (user == null) return this.StatusCode(403, "");
+        UserEntity? user = await this.database.UserFromGameToken(token);
+        if (user == null) return this.Forbid();
 
-        Slot? slot = await this.DeserializeBody<Slot>();
+        GameUserSlot? slot = await this.DeserializeBody<GameUserSlot>();
 
         if (slot == null)
         {
@@ -101,17 +114,23 @@ public class PublishController : ControllerBase
             return this.BadRequest();
         }
 
-        if (slot.Location == null)
+        if (slot.Resources?.Length == 0)
         {
-            Logger.Warn("Rejecting level upload, slot location is null", LogArea.Publish);
+            Logger.Warn("Rejecting level upload, resource list is null", LogArea.Publish);
             return this.BadRequest();
         }
+        // Yes Rider, this isn't null
+        Debug.Assert(slot.Resources != null, "slot.ResourceList != null");
+
+        slot.Description = CensorHelper.FilterMessage(slot.Description);
 
         if (slot.Description.Length > 512)
         {
             Logger.Warn($"Rejecting level upload, description too long ({slot.Description.Length} characters)", LogArea.Publish);
             return this.BadRequest();
         }
+
+        slot.Name = CensorHelper.FilterMessage(slot.Name);
 
         if (slot.Name.Length > 64)
         {
@@ -157,67 +176,61 @@ public class PublishController : ControllerBase
 
         slot.AuthorLabels = LabelHelper.RemoveInvalidLabels(slot.AuthorLabels);
 
-        // Republish logic
+        if (!slot.Resources.Contains(slot.RootLevel))
+            slot.Resources = slot.Resources.Append(rootLevel.Hash).ToArray();
+
+        string resourceCollection = string.Join(",", slot.Resources);
+
+        SlotEntity? oldSlot = null;
         if (slot.SlotId != 0)
         {
-            Slot? oldSlot = await this.database.Slots.Include(s => s.Location).FirstOrDefaultAsync(s => s.SlotId == slot.SlotId);
-            if (oldSlot == null)
-            {
-                Logger.Warn("Rejecting level republish, wasn't able to find old slot", LogArea.Publish);
-                return this.NotFound();
-            }
+            oldSlot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == slot.SlotId);
+        }
 
-            if (oldSlot.Location == null) throw new ArgumentNullException();
-
+        // Republish logic
+        if (oldSlot != null)
+        {
             if (oldSlot.CreatorId != user.UserId)
             {
                 Logger.Warn("Rejecting level republish, old level not owned by current user", LogArea.Publish);
                 return this.BadRequest();
             }
 
-            // I hate lbp3
-            if (game != null)
+            // This is a workaround to prevent lbp3 from overwriting the rootLevel of older levels
+            // For some reason when republishing in lbp3 it automatically converts the level to lbp3
+            // so it must be handled here. The game query is only sent by lbp3 so it can be safely assumed
+            // that if it is present, then the level must be be checked for conversion
+            GameVersion intendedVersion = game != null ? FromAbbreviation(game) : slot.GameVersion;
+            if (intendedVersion != GameVersion.Unknown && intendedVersion == slot.GameVersion)
             {
-                GameVersion intendedVersion = FromAbbreviation(game);
-                if (intendedVersion != GameVersion.Unknown && intendedVersion != slotVersion)
-                {
-                    // Delete the useless rootLevel that lbp3 just uploaded
-                    if (slotVersion == GameVersion.LittleBigPlanet3)
-                        FileHelper.DeleteResource(slot.RootLevel);
-
-                    slot.GameVersion = oldSlot.GameVersion;
-                    slot.RootLevel = oldSlot.RootLevel;
-                    slot.ResourceCollection = oldSlot.ResourceCollection;
-                }
+                oldSlot.GameVersion = slot.GameVersion;
+                oldSlot.RootLevel = rootLevel.Hash;
+                oldSlot.ResourceCollection = resourceCollection;
+            }
+            else
+            {
+                Logger.Warn(
+                    $"Slot rootLevel divergence: game={game}, slotVersion={slot.GameVersion}, intendedVersion={intendedVersion}, oldVersion={oldSlot.GameVersion}",
+                    LogArea.Publish);
             }
 
-            oldSlot.Location.X = slot.Location.X;
-            oldSlot.Location.Y = slot.Location.Y;
+            oldSlot.Name = slot.Name;
+            oldSlot.Description = slot.Description;
+            oldSlot.Location = slot.Location;
+            oldSlot.IconHash = slot.IconHash;
+            oldSlot.BackgroundHash = slot.BackgroundHash;
+            oldSlot.AuthorLabels = slot.AuthorLabels;
+            oldSlot.Shareable = slot.IsShareable;
+            oldSlot.Resources = slot.Resources;
+            oldSlot.InitiallyLocked = slot.InitiallyLocked;
+            oldSlot.Lbp1Only = slot.IsLbp1Only;
+            oldSlot.IsAdventurePlanet = slot.IsAdventurePlanet;
+            oldSlot.LevelType = slot.LevelType;
+            oldSlot.SubLevel = slot.IsSubLevel;
+            oldSlot.MoveRequired = slot.IsMoveRequired;
+            oldSlot.CrossControllerRequired = slot.IsCrossControlRequired;
 
-            slot.CreatorId = oldSlot.CreatorId;
-            slot.LocationId = oldSlot.LocationId;
-            slot.SlotId = oldSlot.SlotId;
-
-            #region Set plays
-
-            slot.PlaysLBP1 = oldSlot.PlaysLBP1;
-            slot.PlaysLBP1Complete = oldSlot.PlaysLBP1Complete;
-            slot.PlaysLBP1Unique = oldSlot.PlaysLBP1Unique;
-
-            slot.PlaysLBP2 = oldSlot.PlaysLBP2;
-            slot.PlaysLBP2Complete = oldSlot.PlaysLBP2Complete;
-            slot.PlaysLBP2Unique = oldSlot.PlaysLBP2Unique;
-
-            slot.PlaysLBP3 = oldSlot.PlaysLBP3;
-            slot.PlaysLBP3Complete = oldSlot.PlaysLBP3Complete;
-            slot.PlaysLBP3Unique = oldSlot.PlaysLBP3Unique;
-
-            #endregion
-
-            slot.FirstUploaded = oldSlot.FirstUploaded;
-            slot.LastUpdated = TimeHelper.UnixTimeMilliseconds();
-
-            slot.TeamPick = oldSlot.TeamPick;
+            oldSlot.LastUpdated = TimeHelper.TimestampMillis;
 
             if (slot.MinimumPlayers == 0 || slot.MaximumPlayers == 0)
             {
@@ -225,63 +238,60 @@ public class PublishController : ControllerBase
                 slot.MaximumPlayers = 4;
             }
 
-            this.database.Entry(oldSlot).CurrentValues.SetValues(slot);
+            oldSlot.MinimumPlayers = Math.Clamp(slot.MinimumPlayers, 1, 4);
+            oldSlot.MaximumPlayers = Math.Clamp(slot.MaximumPlayers, 1, 4);
+
             await this.database.SaveChangesAsync();
-            return this.Ok(oldSlot.Serialize(token.GameVersion));
+            return this.Ok(SlotBase.CreateFromEntity(oldSlot, token));
         }
 
-        if (user.GetUsedSlotsForGame(slotVersion) > user.EntitledSlots)
+        int usedSlots = await this.database.Slots.CountAsync(s => s.CreatorId == token.UserId && s.GameVersion == slotVersion);
+
+        if (usedSlots > user.EntitledSlots)
         {
             Logger.Warn("Rejecting level upload, too many published slots", LogArea.Publish);
             return this.BadRequest();
         }
 
-        //TODO: parse location in body
-        Location l = new()
-        {
-            X = slot.Location.X,
-            Y = slot.Location.Y,
-        };
-        this.database.Locations.Add(l);
-        await this.database.SaveChangesAsync();
-        slot.LocationId = l.Id;
-        slot.CreatorId = user.UserId;
-        slot.FirstUploaded = TimeHelper.UnixTimeMilliseconds();
-        slot.LastUpdated = TimeHelper.UnixTimeMilliseconds();
+        SlotEntity slotEntity = SlotBase.ConvertToEntity(slot);
+        slotEntity.CreatorId = user.UserId;
+        slotEntity.FirstUploaded = TimeHelper.TimestampMillis;
+        slotEntity.LastUpdated = TimeHelper.TimestampMillis;
+        slotEntity.ResourceCollection = resourceCollection;
 
-        if (slot.MinimumPlayers == 0 || slot.MaximumPlayers == 0)
+        if (slotEntity.MinimumPlayers == 0 || slot.MaximumPlayers == 0)
         {
-            slot.MinimumPlayers = 1;
-            slot.MaximumPlayers = 4;
+            slotEntity.MinimumPlayers = 1;
+            slotEntity.MaximumPlayers = 4;
         }
 
-        this.database.Slots.Add(slot);
+        slotEntity.MinimumPlayers = Math.Clamp(slotEntity.MinimumPlayers, 1, 4);
+        slotEntity.MaximumPlayers = Math.Clamp(slotEntity.MaximumPlayers, 1, 4);
+
+        this.database.Slots.Add(slotEntity);
         await this.database.SaveChangesAsync();
 
         if (user.LevelVisibility == PrivacyType.All)
         {
             await WebhookHelper.SendWebhook("New level published!",
-                $"**{user.Username}** just published a new level: [**{slot.Name}**]({ServerConfiguration.Instance.ExternalUrl}/slot/{slot.SlotId})\n{slot.Description}");
+                $"**{user.Username}** just published a new level: [**{slotEntity.Name}**]({ServerConfiguration.Instance.ExternalUrl}/slot/{slotEntity.SlotId})\n{slotEntity.Description}");
         }
 
-        Logger.Success($"Successfully published level {slot.Name} (id: {slot.SlotId}) by {user.Username} (id: {user.UserId})", LogArea.Publish);
+        Logger.Success($"Successfully published level {slotEntity.Name} (id: {slotEntity.SlotId}) by {user.Username} (id: {user.UserId})", LogArea.Publish);
 
-        return this.Ok(slot.Serialize(token.GameVersion));
+        return this.Ok(SlotBase.CreateFromEntity(slotEntity, token));
     }
 
     [HttpPost("unpublish/{id:int}")]
     public async Task<IActionResult> Unpublish(int id)
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        Slot? slot = await this.database.Slots.Include(s => s.Location).FirstOrDefaultAsync(s => s.SlotId == id);
+        SlotEntity? slot = await this.database.Slots.FirstOrDefaultAsync(s => s.SlotId == id);
         if (slot == null) return this.NotFound();
 
-        if (slot.Location == null) throw new ArgumentNullException();
+        if (slot.CreatorId != token.UserId) return this.Forbid();
 
-        if (slot.CreatorId != token.UserId) return this.StatusCode(403, "");
-
-        this.database.Locations.Remove(slot.Location);
         this.database.Slots.Remove(slot);
 
         await this.database.SaveChangesAsync();

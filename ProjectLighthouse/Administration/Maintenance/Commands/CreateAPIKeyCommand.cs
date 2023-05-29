@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData;
 using LBPUnion.ProjectLighthouse.Helpers;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Maintenance;
 
 namespace LBPUnion.ProjectLighthouse.Administration.Maintenance.Commands
 {
@@ -15,14 +18,14 @@ namespace LBPUnion.ProjectLighthouse.Administration.Maintenance.Commands
 
         public async Task Run(string[] args, Logger logger)
         {
-            APIKey key = new() { Description = args[0], };
+            ApiKeyEntity key = new() { Description = args[0], };
             if (string.IsNullOrWhiteSpace(key.Description))
             {
                 key.Description = "<no description specified>";
             }
             key.Key = CryptoHelper.GenerateAuthToken();
             key.Created = DateTime.Now;
-            Database database = new();
+            DatabaseContext database = DatabaseContext.CreateNewInstance();
             await database.APIKeys.AddAsync(key);
             await database.SaveChangesAsync();
             logger.LogSuccess($"The API key has been created (id: {key.Id}), however for security the token will only be shown once.", LogArea.Command);

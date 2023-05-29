@@ -1,9 +1,17 @@
 using System.Globalization;
+using System.Net;
+using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Configuration.ConfigurationCategories;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Localization;
+using LBPUnion.ProjectLighthouse.Mail;
 using LBPUnion.ProjectLighthouse.Middlewares;
+using LBPUnion.ProjectLighthouse.Servers.Website.Captcha;
 using LBPUnion.ProjectLighthouse.Servers.Website.Middlewares;
+using LBPUnion.ProjectLighthouse.Types.Mail;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
 #if !DEBUG
@@ -21,7 +29,7 @@ public class WebsiteStartup
         this.Configuration = configuration;
     }
 
-    public IConfiguration Configuration { get; }
+    private IConfiguration Configuration { get; }
 
     // This method gets called by the runtime. Use this method to add services to the container.
     public void ConfigureServices(IServiceCollection services)
@@ -40,13 +48,41 @@ public class WebsiteStartup
         services.AddRazorPages().WithRazorPagesAtContentRoot();
         #endif
 
-        services.AddDbContext<Database>();
+        services.AddDbContext<DatabaseContext>(builder =>
+        {
+            builder.UseMySql(ServerConfiguration.Instance.DbConnectionString,
+                MySqlServerVersion.LatestSupportedServerVersion);
+        });
+
+        IMailService mailService = ServerConfiguration.Instance.Mail.MailEnabled
+            ? new MailQueueService(new SmtpMailSender())
+            : new NullMailService();
+        services.AddSingleton(mailService);
+
+        services.AddHttpClient<ICaptchaService, CaptchaService>("CaptchaAPI",
+            client =>
+            {
+                Uri captchaUri = ServerConfiguration.Instance.Captcha.Type switch
+                {
+                    CaptchaType.HCaptcha => new Uri("https://hcaptcha.com"),
+                    CaptchaType.ReCaptcha => new Uri("https://www.google.com/recaptcha/api/"),
+                    _ => throw new ArgumentOutOfRangeException(nameof(client)),
+                };
+                client.BaseAddress = captchaUri;
+                client.Timeout = TimeSpan.FromSeconds(5);
+                client.DefaultRequestHeaders.Add("User-Agent", "Project Lighthouse");
+            });
 
         services.Configure<ForwardedHeadersOptions>
         (
             options =>
             {
                 options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                foreach (KeyValuePair<string, string?> proxy in this.Configuration.GetSection("KnownProxies").AsEnumerable())
+                {
+                    if (proxy.Value == null) continue;
+                    options.KnownProxies.Add(IPAddress.Parse(proxy.Value));
+                }
             }
         );
 
@@ -79,8 +115,8 @@ public class WebsiteStartup
         app.UseForwardedHeaders();
 
         app.UseMiddleware<RequestLogMiddleware>();
-        app.UseMiddleware<UserRequiredRedirectMiddleware>();
         app.UseMiddleware<RateLimitMiddleware>();
+        app.UseMiddleware<UserRequiredRedirectMiddleware>();
 
         app.UseRouting();
 

@@ -1,16 +1,16 @@
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Moderation;
 
 public class HiddenLevelsPage : BaseLayout
 {
-    public HiddenLevelsPage(Database database) : base(database)
+    public HiddenLevelsPage(DatabaseContext database) : base(database)
     {}
 
     public int PageAmount;
@@ -19,11 +19,11 @@ public class HiddenLevelsPage : BaseLayout
 
     public int SlotCount;
 
-    public List<Slot> Slots = new();
+    public List<SlotEntity> Slots = new();
 
     public async Task<IActionResult> OnGet([FromRoute] int pageNumber, [FromQuery] string? name)
     {
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("/login");
 
         this.Slots = await this.Database.Slots

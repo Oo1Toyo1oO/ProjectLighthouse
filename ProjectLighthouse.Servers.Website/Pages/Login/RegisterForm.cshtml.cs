@@ -1,12 +1,14 @@
 using System.Diagnostics.CodeAnalysis;
 using JetBrains.Annotations;
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.Extensions;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Localization.StringLists;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Servers.Website.Captcha;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Mail;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,8 +16,14 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Login;
 
 public class RegisterForm : BaseLayout
 {
-    public RegisterForm(Database database) : base(database)
-    { }
+    public readonly IMailService Mail;
+    private readonly ICaptchaService captchaService;
+
+    public RegisterForm(DatabaseContext database, IMailService mail, ICaptchaService captchaService) : base(database)
+    {
+        this.Mail = mail;
+        this.captchaService = captchaService;
+    }
 
     public string? Error { get; private set; }
 
@@ -53,7 +61,7 @@ public class RegisterForm : BaseLayout
             return this.Page();
         }
 
-        User? existingUser = await this.Database.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+        UserEntity? existingUser = await this.Database.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
         if (existingUser != null)
         {
             this.Error = this.Translate(ErrorStrings.UsernameTaken);
@@ -67,15 +75,17 @@ public class RegisterForm : BaseLayout
             return this.Page();
         }
 
-        if (!await this.Request.CheckCaptchaValidity())
+        if (!await this.captchaService.VerifyCaptcha(this.Request))
         {
             this.Error = this.Translate(ErrorStrings.CaptchaFailed);
             return this.Page();
         }
 
-        User user = await this.Database.CreateUser(username, CryptoHelper.BCryptHash(password), emailAddress);
+        UserEntity user = await this.Database.CreateUser(username, CryptoHelper.BCryptHash(password), emailAddress);
 
-        WebToken webToken = new()
+        if(ServerConfiguration.Instance.Mail.MailEnabled) SMTPHelper.SendRegistrationEmail(this.Mail, user);
+
+        WebTokenEntity webToken = new()
         {
             UserId = user.UserId,
             UserToken = CryptoHelper.GenerateAuthToken(),

@@ -1,10 +1,10 @@
-﻿using LBPUnion.ProjectLighthouse.Extensions;
+﻿using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers;
 
@@ -15,9 +15,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers;
 public class LogoutController : ControllerBase
 {
 
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public LogoutController(Database database)
+    public LogoutController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -25,16 +25,15 @@ public class LogoutController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> OnPost()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        User? user = await this.database.UserFromGameToken(token);
-        if (user == null) return this.StatusCode(403, "");
+        UserEntity? user = await this.database.UserFromGameToken(token);
+        if (user == null) return this.Forbid();
 
         user.LastLogout = TimeHelper.TimestampMillis;
 
-        this.database.GameTokens.RemoveWhere(t => t.TokenId == token.TokenId);
-        this.database.LastContacts.RemoveWhere(c => c.UserId == token.UserId);
-        await this.database.SaveChangesAsync();
+        await this.database.GameTokens.RemoveWhere(t => t.TokenId == token.TokenId);
+        await this.database.LastContacts.RemoveWhere(c => c.UserId == token.UserId);
 
         return this.Ok();
     }

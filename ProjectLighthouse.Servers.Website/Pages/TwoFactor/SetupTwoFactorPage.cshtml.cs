@@ -3,11 +3,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Web;
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Localization.StringLists;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Mvc;
 using QRCoder;
 using SixLabors.ImageSharp;
@@ -19,7 +20,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.TwoFactor;
 
 public class SetupTwoFactorPage : BaseLayout
 {
-    public SetupTwoFactorPage(Database database) : base(database)
+    public SetupTwoFactorPage(DatabaseContext database) : base(database)
     { }
 
     public string QrCode { get; set; } = "";
@@ -30,7 +31,7 @@ public class SetupTwoFactorPage : BaseLayout
     {
         if (!ServerConfiguration.Instance.TwoFactorConfiguration.TwoFactorEnabled) return this.Redirect("~/login");
 
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("~/login");
 
         if (user.IsTwoFactorSetup) return this.Redirect("~/");
@@ -86,7 +87,7 @@ public class SetupTwoFactorPage : BaseLayout
         return image.ToBase64String(PngFormat.Instance);
     }
 
-    private static string getQrCode(User user)
+    private static string getQrCode(UserEntity user)
     {
         string instanceName = ServerConfiguration.Instance.Customization.ServerName;
         string totpLink = CryptoHelper.GenerateTotpLink(user.TwoFactorSecret, HttpUtility.HtmlEncode(instanceName), user.Username);
@@ -97,10 +98,10 @@ public class SetupTwoFactorPage : BaseLayout
     {
         if (!ServerConfiguration.Instance.TwoFactorConfiguration.TwoFactorEnabled) return this.Redirect("~/login");
 
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("~/login");
 
         if (user.IsTwoFactorSetup) return this.Redirect("~/");

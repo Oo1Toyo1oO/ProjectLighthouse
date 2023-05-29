@@ -2,14 +2,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Logging;
 using LBPUnion.ProjectLighthouse.Logging.Loggers;
+using LBPUnion.ProjectLighthouse.Types.Entities.Maintenance;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Maintenance;
 
 namespace LBPUnion.ProjectLighthouse.Administration.Maintenance;
 
@@ -62,14 +64,14 @@ public static class MaintenanceHelper
     public static async Task RunMaintenanceJob(string jobName)
     {
         IMaintenanceJob? job = MaintenanceJobs.FirstOrDefault(j => j.GetType().Name == jobName);
-        if (job == null) throw new ArgumentNullException();
+        if (job == null) throw new ArgumentNullException(nameof(jobName));
 
         await job.Run();
     }
 
-    public static async Task RunMigration(IMigrationTask migrationTask, Database? database = null)
+    public static async Task RunMigration(IMigrationTask migrationTask, DatabaseContext? database = null)
     {
-        database ??= new Database();
+        database ??= DatabaseContext.CreateNewInstance();
 
         // Migrations should never be run twice.
         Debug.Assert(!await database.CompletedMigrations.Has(m => m.MigrationName == migrationTask.GetType().Name));
@@ -99,7 +101,7 @@ public static class MaintenanceHelper
         
         Logger.Success($"Successfully completed migration {migrationTask.Name()}", LogArea.Database);
 
-        CompletedMigration completedMigration = new()
+        CompletedMigrationEntity completedMigration = new()
         {
             MigrationName = migrationTask.GetType().Name,
             RanAt = DateTime.Now,

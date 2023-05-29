@@ -1,9 +1,9 @@
 #nullable enable
-using LBPUnion.ProjectLighthouse.Administration;
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,11 +17,11 @@ public class UsersPage : BaseLayout
 
     public int UserCount;
 
-    public List<User> Users = new();
+    public List<UserEntity> Users = new();
 
     public string? SearchValue;
 
-    public UsersPage(Database database) : base(database)
+    public UsersPage(DatabaseContext database) : base(database)
     {}
 
     public async Task<IActionResult> OnGet([FromRoute] int pageNumber, [FromQuery] string? name)

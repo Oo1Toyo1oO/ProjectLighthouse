@@ -1,12 +1,15 @@
 #nullable enable
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.Levels.Categories;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.Serialization;
+using LBPUnion.ProjectLighthouse.Servers.GameServer.Types.Categories;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Levels;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +22,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers.Slots;
 [Produces("text/xml")]
 public class CollectionController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public CollectionController(Database database)
+    public CollectionController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -29,17 +32,17 @@ public class CollectionController : ControllerBase
     [HttpGet("playlists/{playlistId:int}/slots")]
     public async Task<IActionResult> GetPlaylistSlots(int playlistId)
     {
-        Playlist? targetPlaylist = await this.database.Playlists.FirstOrDefaultAsync(p => p.PlaylistId == playlistId);
+        PlaylistEntity? targetPlaylist = await this.database.Playlists.FirstOrDefaultAsync(p => p.PlaylistId == playlistId);
         if (targetPlaylist == null) return this.BadRequest();
 
-        IQueryable<Slot> slots = this.database.Slots.Include(s => s.Creator)
-            .Include(s => s.Location)
-            .Where(s => targetPlaylist.SlotIds.Contains(s.SlotId));
+        GameTokenEntity token = this.GetToken();
 
-        string response = Enumerable.Aggregate(slots, string.Empty, (current, slot) => current + slot.Serialize());
+        List<SlotBase> slots = (await this.database.Slots.Where(s => targetPlaylist.SlotIds.Contains(s.SlotId)).ToListAsync())
+            .ToSerializableList(s => SlotBase.CreateFromEntity(s, token));
+
         int total = targetPlaylist.SlotIds.Length;
 
-        return this.Ok(LbpSerializer.TaggedStringElement("slots", response, "total", total));
+        return this.Ok(new GenericSlotResponse(slots, total, 0));
     }
 
     [HttpPost("playlists/{playlistId:int}")]
@@ -48,9 +51,9 @@ public class CollectionController : ControllerBase
     [HttpPost("playlists/{playlistId:int}/order_slots")]
     public async Task<IActionResult> UpdatePlaylist(int playlistId, int slotId)
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        Playlist? targetPlaylist = await this.database.Playlists.FirstOrDefaultAsync(p => p.PlaylistId == playlistId);
+        PlaylistEntity? targetPlaylist = await this.database.Playlists.FirstOrDefaultAsync(p => p.PlaylistId == playlistId);
         if (targetPlaylist == null) return this.BadRequest();
 
         if (token.UserId != targetPlaylist.CreatorId) return this.BadRequest();
@@ -60,10 +63,10 @@ public class CollectionController : ControllerBase
         {
             targetPlaylist.SlotIds = targetPlaylist.SlotIds.Where(s => s != slotId).ToArray();
             await this.database.SaveChangesAsync();
-            return this.Ok(this.GetUserPlaylists(token.UserId));
+            return this.Ok(await this.GetUserPlaylists(token.UserId));
         }
 
-        Playlist? newPlaylist = await this.DeserializeBody<Playlist>("playlist", "levels");
+        GamePlaylist? newPlaylist = await this.DeserializeBody<GamePlaylist>("playlist", "levels");
 
         if (newPlaylist == null) return this.BadRequest();
 
@@ -92,44 +95,49 @@ public class CollectionController : ControllerBase
 
         await this.database.SaveChangesAsync();
 
-        return this.Ok(this.GetUserPlaylists(token.UserId));
+        return this.Ok(await this.GetUserPlaylists(token.UserId));
     }
 
-    private string GetUserPlaylists(int userId)
+    private async Task<PlaylistResponse> GetUserPlaylists(int userId)
     {
-        string response = Enumerable.Aggregate(
-            this.database.Playlists.Include(p => p.Creator).Where(p => p.CreatorId == userId),
-            string.Empty,
-            (current, slot) => current + slot.Serialize());
+        List<GamePlaylist> playlists = (await this.database.Playlists.Where(p => p.CreatorId == userId)
+            .ToListAsync()).ToSerializableList(GamePlaylist.CreateFromEntity);
         int total = this.database.Playlists.Count(p => p.CreatorId == userId);
 
-        return LbpSerializer.TaggedStringElement("playlists", response, new Dictionary<string, object>
+        return new PlaylistResponse
         {
-            {"total", total},
-            {"hint_start", total+1},
-        });
+            Playlists = playlists,
+            Total = total,
+            HintStart = total+1,
+        };
     }
 
     [HttpPost("playlists")]
     public async Task<IActionResult> CreatePlaylist()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
         int playlistCount = await this.database.Playlists.CountAsync(p => p.CreatorId == token.UserId);
 
         if (playlistCount > ServerConfiguration.Instance.UserGeneratedContentLimits.ListsQuota) return this.BadRequest();
 
-        Playlist? playlist = await this.DeserializeBody<Playlist>("playlist");
+        GamePlaylist? playlist = await this.DeserializeBody<GamePlaylist>("playlist");
 
         if (playlist == null) return this.BadRequest();
 
-        playlist.CreatorId = token.UserId;
+        PlaylistEntity playlistEntity = new()
+        {
+            CreatorId = token.UserId,
+            Description = playlist.Description,
+            Name = playlist.Name,
+            SlotIds = playlist.SlotIds,
+        };
 
-        this.database.Playlists.Add(playlist);
+        this.database.Playlists.Add(playlistEntity);
 
         await this.database.SaveChangesAsync();
 
-        return this.Ok(this.GetUserPlaylists(token.UserId));
+        return this.Ok(GamePlaylist.CreateFromEntity(playlistEntity));
     }
 
     [HttpGet("user/{username}/playlists")]
@@ -138,101 +146,97 @@ public class CollectionController : ControllerBase
         int targetUserId = await this.database.UserIdFromUsername(username);
         if (targetUserId == 0) return this.BadRequest();
 
-        return this.Ok(this.GetUserPlaylists(targetUserId));
+        return this.Ok(await this.GetUserPlaylists(targetUserId));
     }
 
     [HttpGet("searches")]
     [HttpGet("genres")]
     public async Task<IActionResult> GenresAndSearches()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        User? user = await this.database.UserFromGameToken(token);
-        if (user == null) return this.StatusCode(403, "");
+        UserEntity? user = await this.database.UserFromGameToken(token);
+        if (user == null) return this.Forbid();
 
-        string categoriesSerialized = CategoryHelper.Categories.Aggregate
-        (
-            string.Empty,
-            (current, category) =>
-            {
-                string serialized;
+        List<GameCategory> categories = new();
 
-                if (category is CategoryWithUser categoryWithUser) serialized = categoryWithUser.Serialize(this.database, user);
-                else serialized = category.Serialize(this.database);
+        foreach (Category category in CategoryHelper.Categories.ToList())
+        {
+            if(category is CategoryWithUser categoryWithUser) categories.Add(categoryWithUser.Serialize(this.database, user));
+            else categories.Add(category.Serialize(this.database));
+        }
 
-                return current + serialized;
-            }
-        );
-
-        categoriesSerialized += LbpSerializer.StringElement("text_search", LbpSerializer.StringElement("url", "/slots/searchLBP3"));
-
-        return this.Ok
-        (
-            LbpSerializer.TaggedStringElement
-            (
-                "categories",
-                categoriesSerialized,
-                new Dictionary<string, object>
-                {
-                    {
-                        "hint", ""
-                    },
-                    {
-                        "hint_start", 1
-                    },
-                    {
-                        "total", CategoryHelper.Categories.Count
-                    },
-                }
-            )
-        );
+        return this.Ok(new CategoryListResponse(categories, CategoryHelper.Categories.Count, 0, 1));
     }
 
     [HttpGet("searches/{endpointName}")]
-    public async Task<IActionResult> GetCategorySlots(string endpointName, [FromQuery] int pageStart, [FromQuery] int pageSize)
+    public async Task<IActionResult> GetCategorySlots(string endpointName, [FromQuery] int pageStart, [FromQuery] int pageSize,
+        [FromQuery] int players = 0,
+        [FromQuery] string? labelFilter0 = null,
+        [FromQuery] string? labelFilter1 = null,
+        [FromQuery] string? labelFilter2 = null,
+        [FromQuery] string? labelFilter3 = null,
+        [FromQuery] string? labelFilter4 = null,
+        [FromQuery] string? move = null,
+        [FromQuery] string? adventure = null
+    )
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        User? user = await this.database.UserFromGameToken(token);
-        if (user == null) return this.StatusCode(403, "");
+        UserEntity? user = await this.database.UserFromGameToken(token);
+        if (user == null) return this.Forbid();
 
         Category? category = CategoryHelper.Categories.FirstOrDefault(c => c.Endpoint == endpointName);
         if (category == null) return this.NotFound();
 
         Logger.Debug("Found category " + category, LogArea.Category);
 
-        List<Slot> slots;
+        List<SlotEntity> slots;
         int totalSlots;
 
         if (category is CategoryWithUser categoryWithUser)
         {
-            slots = categoryWithUser.GetSlots(this.database, user, pageStart, pageSize).ToList();
+            slots = (await categoryWithUser.GetSlots(this.database, user, pageStart, pageSize)
+                .ToListAsync());
             totalSlots = categoryWithUser.GetTotalSlots(this.database, user);
         }
         else
         {
-            slots = category.GetSlots(this.database, pageStart, pageSize).ToList();
+            slots = category.GetSlots(this.database, pageStart, pageSize)
+                .ToList();
             totalSlots = category.GetTotalSlots(this.database);
         }
 
-        string slotsSerialized = slots.Aggregate(string.Empty, (current, slot) => current + slot.Serialize(token.GameVersion));
+        slots = this.filterSlots(slots, players + 1, labelFilter0, labelFilter1, labelFilter2, labelFilter3, labelFilter4, move, adventure);
 
-        return this.Ok
-        (
-            LbpSerializer.TaggedStringElement
-            (
-                "results",
-                slotsSerialized,
-                new Dictionary<string, object>
-                {
-                    {
-                        "total", totalSlots
-                    },
-                    {
-                        "hint_start", pageStart + pageSize
-                    },
-                }
-            )
-        );
+        return this.Ok(new GenericSlotResponse("results", slots.ToSerializableList(s => SlotBase.CreateFromEntity(s, token)), totalSlots, pageStart + pageSize));
+    }
+
+    private List<SlotEntity> filterSlots(List<SlotEntity> slots, int players, string? labelFilter0 = null, string? labelFilter1 = null, string? labelFilter2 = null, string? labelFilter3 = null, string? labelFilter4 = null, string? move = null, string? adventure = null)
+    {
+        slots.RemoveAll(s => s.MinimumPlayers != players);
+
+        if (labelFilter0 != null)
+            slots.RemoveAll(s => !s.AuthorLabels.Split(',').ToList().Contains(labelFilter0));
+        if (labelFilter1 != null)
+            slots.RemoveAll(s => !s.AuthorLabels.Split(',').ToList().Contains(labelFilter1));
+        if (labelFilter2 != null)
+            slots.RemoveAll(s => !s.AuthorLabels.Split(',').ToList().Contains(labelFilter2));
+        if (labelFilter3 != null)
+            slots.RemoveAll(s => !s.AuthorLabels.Split(',').ToList().Contains(labelFilter3));
+        if (labelFilter4 != null)
+            slots.RemoveAll(s => !s.AuthorLabels.Split(',').ToList().Contains(labelFilter4));
+
+        if (move == "noneCan")
+            slots.RemoveAll(s => s.MoveRequired);
+        if (move == "allMust")
+            slots.RemoveAll(s => !s.MoveRequired);
+
+        if (adventure == "noneCan")
+            slots.RemoveAll(s => s.IsAdventurePlanet);
+        if (adventure == "allMust")
+            slots.RemoveAll(s => !s.IsAdventurePlanet);
+
+        return slots;
     }
 }

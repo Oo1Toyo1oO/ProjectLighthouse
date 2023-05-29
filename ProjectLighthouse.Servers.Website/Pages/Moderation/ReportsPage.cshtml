@@ -1,6 +1,6 @@
 ﻿@page "/moderation/reports/{pageNumber:int}"
-@using LBPUnion.ProjectLighthouse.Administration.Reports
 @using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
+@using LBPUnion.ProjectLighthouse.Types.Entities.Moderation
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.Moderation.ReportsPage
 
 @{
@@ -28,7 +28,7 @@
     let images = [];
 </script>
 
-@foreach (GriefReport report in Model.Reports)
+@foreach (GriefReportEntity report in Model.Reports)
 {
     @await Html.PartialAsync("Partials/ReportPartial", report, ViewData.WithTime(timeZone))
 }

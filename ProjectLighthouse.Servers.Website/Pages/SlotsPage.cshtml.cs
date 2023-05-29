@@ -1,10 +1,11 @@
 #nullable enable
 using System.Text;
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Levels;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,11 +20,11 @@ public class SlotsPage : BaseLayout
 
     public int SlotCount;
 
-    public List<Slot> Slots = new();
+    public List<SlotEntity> Slots = new();
 
     public string? SearchValue;
 
-    public SlotsPage(Database database) : base(database)
+    public SlotsPage(DatabaseContext database) : base(database)
     {}
 
     public async Task<IActionResult> OnGet([FromRoute] int pageNumber, [FromQuery] string? name)
@@ -56,26 +57,22 @@ public class SlotsPage : BaseLayout
         
         string trimmedSearch = finalSearch.ToString().Trim();
 
-        this.SlotCount = await this.Database.Slots.Include(p => p.Creator)
+        IQueryable<SlotEntity> slots = this.Database.Slots.Include(p => p.Creator)
             .Where(p => p.Type == SlotType.User && !p.Hidden)
             .Where(p => p.Name.Contains(trimmedSearch))
             .Where(p => p.Creator != null && (targetAuthor == null || string.Equals(p.Creator.Username.ToLower(), targetAuthor.ToLower())))
             .Where(p => p.Creator != null && (!p.SubLevel || p.Creator == this.User))
-            .Where(p => targetGame == null || p.GameVersion == targetGame)
-            .CountAsync();
+            .Where(p => targetGame == null || p.GameVersion == targetGame);
+
+        this.SlotCount = await slots.CountAsync();
 
         this.PageNumber = pageNumber;
         this.PageAmount = Math.Max(1, (int)Math.Ceiling((double)this.SlotCount / ServerStatics.PageSize));
 
         if (this.PageNumber < 0 || this.PageNumber >= this.PageAmount) return this.Redirect($"/slots/{Math.Clamp(this.PageNumber, 0, this.PageAmount - 1)}");
 
-        this.Slots = await this.Database.Slots.Include(p => p.Creator)
-            .Where(p => p.Type == SlotType.User && !p.Hidden)
-            .Where(p => p.Name.Contains(trimmedSearch))
-            .Where(p => p.Creator != null && (targetAuthor == null || string.Equals(p.Creator.Username.ToLower(), targetAuthor.ToLower())))
-            .Where(p => p.Creator != null && (!p.SubLevel || p.Creator == this.User))
+        this.Slots = await slots
             .Where(p => p.Creator!.LevelVisibility == PrivacyType.All) // TODO: change check for when user is logged in
-            .Where(p => targetGame == null || p.GameVersion == targetGame)
             .OrderByDescending(p => p.FirstUploaded)
             .Skip(pageNumber * ServerStatics.PageSize)
             .Take(ServerStatics.PageSize)

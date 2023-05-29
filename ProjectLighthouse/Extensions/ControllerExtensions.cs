@@ -2,61 +2,81 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Serialization;
-using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData;
+using LBPUnion.ProjectLighthouse.Serialization;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LBPUnion.ProjectLighthouse.Extensions;
 
-public static class ControllerExtensions
+public static partial class ControllerExtensions
 {
 
-    public static GameToken GetToken(this ControllerBase controller)
+    public static GameTokenEntity GetToken(this ControllerBase controller)
     {
-        GameToken? token = (GameToken?)(controller.HttpContext.Items["Token"] ?? null);
-        if (token == null) throw new ArgumentNullException($"GameToken was null even though authentication was successful {nameof(controller)}");
+        GameTokenEntity? token = (GameTokenEntity?)(controller.HttpContext.Items["Token"] ?? null);
+        if (token == null) throw new ArgumentNullException(nameof(controller), @"GameToken was null even though authentication was successful");
 
         return token;
     }
 
+    public static async Task<string> ReadBodyAsync(this ControllerBase controller)
+    {
+        byte[] bodyBytes = await controller.Request.BodyReader.ReadAllAsync();
+        if (controller.Request.ContentLength != null && bodyBytes.Length != controller.Request.ContentLength)
+        {
+            Logger.Warn($"Failed to read entire body, contentType={controller.Request.ContentType}, " +
+                        $"contentLen={controller.Request.ContentLength}, readLen={bodyBytes.Length}",
+                LogArea.HTTP);
+        }
+        return Encoding.UTF8.GetString(bodyBytes);
+    }
+
+    [GeneratedRegex("&(?!(amp|apos|quot|lt|gt);)")]
+    private static partial Regex CharacterEscapeRegex();
+
     public static async Task<T?> DeserializeBody<T>(this ControllerBase controller, params string[] rootElements)
     {
-        controller.Request.Body.Position = 0;
-        string bodyString = await new StreamReader(controller.Request.Body).ReadToEndAsync();
-
+        string bodyString = await controller.ReadBodyAsync();
         try
         {
             // Prevent unescaped ampersands from causing deserialization to fail
-            bodyString = Regex.Replace(bodyString, "&(?!(amp|apos|quot|lt|gt);)", "&amp;");
+            bodyString = CharacterEscapeRegex().Replace(bodyString, "&amp;");
 
             XmlRootAttribute? root = null;
             if (rootElements.Length > 0)
             {
-                //TODO: This doesn't support root tags with attributes, but it's only used in scenarios where there shouldn't any (UpdateUser and Playlists)
-                string? matchedRoot = rootElements.FirstOrDefault(e => bodyString.StartsWith($@"<{e}>"));
-                if (matchedRoot == null)
+                XmlDocument doc = new();
+                doc.LoadXml(bodyString);
+                string? rootElement = doc.DocumentElement?.Name;
+                if (rootElement == null || !rootElements.Contains(rootElement))
                 {
                     Logger.Error($"[{controller.ControllerContext.ActionDescriptor.ActionName}] " +
-                                 $"Failed to deserialize {typeof(T).Name}: Unable to match root element", LogArea.Deserialization);
-                    Logger.Error($"{bodyString}", LogArea.Deserialization);
+                                 $"Failed to deserialize {typeof(T).Name}: Unable to match root element\n" +
+                                 $"rootElement: '{rootElement ?? "null"}'" +
+                                 $"xmlData: '{bodyString}'",
+                        LogArea.Deserialization);
                     return default;
                 }
-                root = new XmlRootAttribute(matchedRoot);
+                root = new XmlRootAttribute(rootElement);
             }
-            XmlSerializer serializer = new(typeof(T), root);
+            XmlSerializer serializer = LighthouseSerializer.GetSerializer(typeof(T), root);
             T? obj = (T?)serializer.Deserialize(new StringReader(bodyString));
-            SanitizationHelper.SanitizeStringsInClass(obj);
             return obj;
         }
         catch (Exception e)
         {
             Logger.Error($"[{controller.ControllerContext.ActionDescriptor.ActionName}] " +
-                         $"Failed to deserialize {typeof(T).Name}: {e.Message}", LogArea.Deserialization);
-            Logger.Error($"{bodyString}", LogArea.Deserialization);
+                         $"Failed to deserialize {typeof(T).Name}:\n" +
+                         $"xmlData: '{bodyString}'\n" +
+                         $"detailedException: '{e.ToDetailedException()}",
+                LogArea.Deserialization);
         }
         return default;
     }

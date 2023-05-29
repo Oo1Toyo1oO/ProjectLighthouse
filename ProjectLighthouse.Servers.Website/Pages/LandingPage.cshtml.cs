@@ -1,9 +1,11 @@
 #nullable enable
 using JetBrains.Annotations;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Levels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,19 +13,19 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages;
 
 public class LandingPage : BaseLayout
 {
-    public LandingPage(Database database) : base(database)
+    public LandingPage(DatabaseContext database) : base(database)
     {}
 
     public int PendingAuthAttempts;
-    public List<User> PlayersOnline = new();
+    public List<UserEntity> PlayersOnline = new();
 
-    public List<Slot>? LatestTeamPicks;
-    public List<Slot>? NewestLevels;
+    public List<SlotEntity>? LatestTeamPicks;
+    public List<SlotEntity>? NewestLevels;
 
     [UsedImplicitly]
     public async Task<IActionResult> OnGet()
     {
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user != null && user.PasswordResetRequired) return this.Redirect("~/passwordResetRequired");
 
         if (user != null)

@@ -1,6 +1,6 @@
 @page "/moderation/cases/{pageNumber:int}"
-@using LBPUnion.ProjectLighthouse.Administration
 @using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
+@using LBPUnion.ProjectLighthouse.Types.Entities.Moderation
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.Moderation.CasePage
 
 @{
@@ -21,7 +21,7 @@
 
 <div class="ui divider"></div>
 
-@foreach (ModerationCase @case in Model.Cases)
+@foreach (ModerationCaseEntity @case in Model.Cases)
 {
     @(await Html.PartialAsync("Partials/ModerationCasePartial", @case, ViewData.WithTime(timeZone)))
 }

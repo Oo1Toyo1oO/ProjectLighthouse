@@ -1,12 +1,13 @@
 #nullable enable
-using LBPUnion.ProjectLighthouse.Administration;
 using LBPUnion.ProjectLighthouse.Administration.Maintenance;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Servers.Website.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Maintenance;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Admin;
@@ -14,7 +15,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Admin;
 public class AdminPanelPage : BaseLayout
 {
     public List<ICommand> Commands = MaintenanceHelper.Commands;
-    public AdminPanelPage(Database database) : base(database)
+    public AdminPanelPage(DatabaseContext database) : base(database)
     { }
 
     public List<AdminPanelStatistic> Statistics = new();
@@ -23,14 +24,14 @@ public class AdminPanelPage : BaseLayout
 
     public async Task<IActionResult> OnGet([FromQuery] string? args, [FromQuery] string? command, [FromQuery] string? maintenanceJob, [FromQuery] string? log)
     {
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("~/login");
         if (!user.IsAdmin) return this.NotFound();
 
         this.Statistics.Add(new AdminPanelStatistic("Users", await StatisticsHelper.UserCount(this.Database), "/admin/users"));
         this.Statistics.Add(new AdminPanelStatistic("Slots", await StatisticsHelper.SlotCount(this.Database)));
         this.Statistics.Add(new AdminPanelStatistic("Photos", await StatisticsHelper.PhotoCount(this.Database)));
-        this.Statistics.Add(new AdminPanelStatistic("API Keys", await StatisticsHelper.APIKeyCount(this.Database), "/admin/keys"));
+        this.Statistics.Add(new AdminPanelStatistic("API Keys", await StatisticsHelper.ApiKeyCount(this.Database), "/admin/keys"));
 
         if (!string.IsNullOrEmpty(command))
         {

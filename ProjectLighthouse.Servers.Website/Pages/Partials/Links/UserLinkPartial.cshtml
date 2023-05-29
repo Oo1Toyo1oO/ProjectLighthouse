@@ -1,14 +1,28 @@
+@using LBPUnion.ProjectLighthouse.Database
 @using LBPUnion.ProjectLighthouse.Localization
-@model LBPUnion.ProjectLighthouse.PlayerData.Profiles.User
+@using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
+@model LBPUnion.ProjectLighthouse.Types.Entities.Profile.UserEntity
 
 @{
     string language = (string?)ViewData["Language"] ?? LocalizationManager.DefaultLang;
     string timeZone = (string?)ViewData["TimeZone"] ?? TimeZoneInfo.Local.Id;
     bool includeStatus = (bool?)ViewData["IncludeStatus"] ?? false;
-    string userStatus = includeStatus ? Model.Status.ToTranslatedString(language, timeZone) : "";
+    await using DatabaseContext database = DatabaseContext.CreateNewInstance(); 
+    string userStatus = includeStatus ? Model.GetStatus(database).ToTranslatedString(language, timeZone) : "";
 }
 
 <a href="/user/@Model.UserId" title="@userStatus" class="user-link">
     <img src="/gameAssets/@Model.WebsiteAvatarHash" alt=""/>
-    @Model.Username
+
+    @if (Model.IsModerator)
+    {
+        <span style="color: @Model.PermissionLevel.ToHtmlColor(); font-weight: 600;">
+            @Model.Username
+        </span>
+    }
+    else
+    {
+        @Model.Username
+    }
+
 </a>

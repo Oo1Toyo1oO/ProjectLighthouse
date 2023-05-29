@@ -3,22 +3,25 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Files;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.PlayerData;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Maintenance;
+using LBPUnion.ProjectLighthouse.Types.Resources;
 
 namespace LBPUnion.ProjectLighthouse.Administration.Maintenance.MaintenanceJobs;
 
 public class CleanupBrokenPhotosMaintenanceJob : IMaintenanceJob
 {
-    private readonly Database database = new();
+    private readonly DatabaseContext database = DatabaseContext.CreateNewInstance();
     public string Name() => "Cleanup Broken Photos";
     public string Description() => "Deletes all photos that have missing assets or invalid photo subjects.";
 
     [SuppressMessage("ReSharper", "LoopCanBePartlyConvertedToQuery")]
     public async Task Run()
     {
-        foreach (Photo photo in this.database.Photos)
+        foreach (PhotoEntity photo in this.database.Photos)
         {
             bool hashNullOrEmpty = false;
             bool noHashesExist = false;
@@ -29,7 +32,7 @@ public class CleanupBrokenPhotosMaintenanceJob : IMaintenanceJob
 
             // Checks should generally be ordered in least computationally expensive to most.
 
-            if (photo.Subjects.Count > 4)
+            if (photo.PhotoSubjects.Count > 4)
             {
                 tooManyPhotoSubjects = true;
                 goto removePhoto;
@@ -57,7 +60,7 @@ public class CleanupBrokenPhotosMaintenanceJob : IMaintenanceJob
             };
 
             List<int> subjectUserIds = new(4);
-            foreach (PhotoSubject subject in photo.Subjects)
+            foreach (PhotoSubjectEntity subject in photo.PhotoSubjects)
             {
                 if (subjectUserIds.Contains(subject.UserId))
                 {

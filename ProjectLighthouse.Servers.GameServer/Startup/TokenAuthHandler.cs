@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Text.Encodings.Web;
-using LBPUnion.ProjectLighthouse.PlayerData;
+using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -10,7 +11,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Startup;
 
 public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
     private const string cookie = "MM_AUTH";
 
     public TokenAuthHandler
@@ -18,7 +19,7 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         UrlEncoder encoder,
         ISystemClock clock,
-        Database database
+        DatabaseContext database
         // I said I don't want any damn vegetables (logs)
     ) : base(options, new NullLoggerFactory(), encoder, clock)
     {
@@ -35,7 +36,7 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
     {
         if (!this.Context.Request.Cookies.ContainsKey(cookie)) return AuthenticateResult.Fail("No auth cookie");
 
-        GameToken? gameToken = await this.database.GameTokenFromRequest(this.Request);
+        GameTokenEntity? gameToken = await this.database.GameTokenFromRequest(this.Request);
         if (gameToken == null) return AuthenticateResult.Fail("No game token");
 
              if (this.Context.Request.Headers.TryGetValue("User-Agent", out StringValues useragent))

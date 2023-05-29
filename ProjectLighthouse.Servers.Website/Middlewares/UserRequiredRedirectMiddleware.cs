@@ -1,7 +1,8 @@
 ﻿using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Middlewares;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Servers.Website.Middlewares;
@@ -11,16 +12,16 @@ public class UserRequiredRedirectMiddleware : MiddlewareDBContext
     public UserRequiredRedirectMiddleware(RequestDelegate next) : base(next)
     { }
 
-    public override async Task InvokeAsync(HttpContext ctx, Database database)
+    public override async Task InvokeAsync(HttpContext ctx, DatabaseContext database)
     {
-        WebToken? token = database.WebTokenFromRequest(ctx.Request);
+        WebTokenEntity? token = database.WebTokenFromRequest(ctx.Request);
         if (token == null || pathContains(ctx, "/logout"))
         {
             await this.next(ctx);
             return;
         }
 
-        User? user = await database.Users.FirstOrDefaultAsync(u => u.UserId == token.UserId);
+        UserEntity? user = await database.Users.FirstOrDefaultAsync(u => u.UserId == token.UserId);
         if (user == null)
         {
             await this.next(ctx);

@@ -1,8 +1,11 @@
 #nullable enable
-using LBPUnion.ProjectLighthouse.Administration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Files;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Moderation.Cases;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using IOFile = System.IO.File;
@@ -13,9 +16,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Controllers.Admin;
 [Route("moderation/user/{id:int}")]
 public class AdminUserController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public AdminUserController(Database database)
+    public AdminUserController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -25,10 +28,10 @@ public class AdminUserController : ControllerBase
     /// </summary>
     [HttpGet("wipePlanets")]
     public async Task<IActionResult> WipePlanets([FromRoute] int id) {
-        User? user = this.database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.database.UserFromWebRequest(this.Request);
         if (user == null || !user.IsModerator) return this.NotFound();
 
-        User? targetedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        UserEntity? targetedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (targetedUser == null) return this.NotFound();
         
         string[] hashes = {
@@ -44,7 +47,7 @@ public class AdminUserController : ControllerBase
             if (string.IsNullOrWhiteSpace(hash)) continue;
             
             // Find users with a matching hash
-            List<User> users = await this.database.Users
+            List<UserEntity> users = await this.database.Users
                 .Where(u => u.PlanetHashLBP2 == hash ||
                             u.PlanetHashLBP3 == hash ||
                             u.PlanetHashLBPVita == hash)
@@ -54,7 +57,7 @@ public class AdminUserController : ControllerBase
             System.Diagnostics.Debug.Assert(users.Count != 0);
             
             // Reset each users' hash.
-            foreach (User userWithPlanet in users)
+            foreach (UserEntity userWithPlanet in users)
             {
                 userWithPlanet.PlanetHashLBP2 = "";
                 userWithPlanet.PlanetHashLBP3 = "";
@@ -89,10 +92,10 @@ public class AdminUserController : ControllerBase
     [HttpPost("/admin/user/{id:int}/setPermissionLevel")]
     public async Task<IActionResult> SetUserPermissionLevel([FromRoute] int id, [FromForm] PermissionLevel role)
     {
-        User? user = this.database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.database.UserFromWebRequest(this.Request);
         if (user == null || !user.IsAdmin) return this.NotFound();
 
-        User? targetedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        UserEntity? targetedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (targetedUser == null) return this.NotFound();
 
         if (role != PermissionLevel.Banned)

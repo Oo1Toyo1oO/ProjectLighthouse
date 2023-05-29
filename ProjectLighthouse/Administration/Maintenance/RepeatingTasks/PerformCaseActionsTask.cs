@@ -2,9 +2,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using LBPUnion.ProjectLighthouse.Levels;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Moderation;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Maintenance;
+using LBPUnion.ProjectLighthouse.Types.Moderation.Cases;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Administration.Maintenance.RepeatingTasks;
@@ -14,12 +20,12 @@ public class PerformCaseActionsTask : IRepeatingTask
     public string Name => "Perform actions on moderation cases";
     public TimeSpan RepeatInterval => TimeSpan.FromSeconds(10);
     public DateTime LastRan { get; set; }
-    public async Task Run(Database database)
+    public async Task Run(DatabaseContext database)
     {
-        foreach (ModerationCase @case in await database.Cases.Where(c => !c.Processed).ToListAsync())
+        foreach (ModerationCaseEntity @case in await database.Cases.Where(c => !c.Processed).ToListAsync())
         {
-            User? user = null;
-            Slot? slot = null;
+            UserEntity? user = null;
+            SlotEntity? slot = null;
 
             if (@case.Type.AffectsUser())
             {

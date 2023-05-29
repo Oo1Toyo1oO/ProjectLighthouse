@@ -2,21 +2,21 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using LBPUnion.ProjectLighthouse.Match.Rooms;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Matchmaking.Rooms;
 
 namespace LBPUnion.ProjectLighthouse.Extensions;
 
 public static class RoomExtensions
 {
-    public static List<User> GetPlayers(this Room room, Database database)
+    public static List<UserEntity> GetPlayers(this Room room, DatabaseContext database)
     {
-        List<User> players = new();
+        List<UserEntity> players = new();
         foreach (int playerId in room.PlayerIds)
         {
-            User? player = database.Users.FirstOrDefault(p => p.UserId == playerId);
-            Debug.Assert(player != null);
+            UserEntity? player = database.Users.FirstOrDefault(p => p.UserId == playerId);
+            Debug.Assert(player != null, "RoomExtensions: player == null");
 
             players.Add(player);
         }

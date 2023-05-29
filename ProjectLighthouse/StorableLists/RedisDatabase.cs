@@ -5,11 +5,13 @@ using System.Threading.Tasks;
 using LBPUnion.ProjectLighthouse.Configuration;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.Match.Rooms;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Matchmaking.Rooms;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Redis.OM;
 using Redis.OM.Contracts;
 using Redis.OM.Searching;
+using StackExchange.Redis;
 
 namespace LBPUnion.ProjectLighthouse.StorableLists;
 
@@ -19,6 +21,7 @@ public static class RedisDatabase
 
     static RedisDatabase()
     {
+        ConnectionMultiplexer.SetFeatureFlag("preventthreadtheft", true);
         provider = new RedisConnectionProvider(ServerConfiguration.Instance.RedisConnectionString);
     }
 

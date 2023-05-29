@@ -1,11 +1,12 @@
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Localization.StringLists;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Email;
 
 public class SetEmailForm : BaseLayout
 {
-    public SetEmailForm(Database database) : base(database)
+    public SetEmailForm(DatabaseContext database) : base(database)
     {}
 
     public string? Error { get; private set; }
@@ -21,7 +22,7 @@ public class SetEmailForm : BaseLayout
     public IActionResult OnGet()
     {
         if (!ServerConfiguration.Instance.Mail.MailEnabled) return this.NotFound();
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("/login");
 
         return this.Page();
@@ -32,10 +33,10 @@ public class SetEmailForm : BaseLayout
     {
         if (!ServerConfiguration.Instance.Mail.MailEnabled) return this.NotFound();
 
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
-        User? user = await this.Database.Users.FirstOrDefaultAsync(u => u.UserId == token.UserId);
+        UserEntity? user = await this.Database.Users.FirstOrDefaultAsync(u => u.UserId == token.UserId);
         if (user == null) return this.Redirect("~/login");
 
         if (!SanitizationHelper.IsValidEmail(emailAddress))

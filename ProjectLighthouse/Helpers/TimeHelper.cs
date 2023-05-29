@@ -4,12 +4,9 @@ namespace LBPUnion.ProjectLighthouse.Helpers;
 
 public static class TimeHelper
 {
-    public static long UnixTimeMilliseconds() => DateTimeOffset.Now.ToUnixTimeMilliseconds();
-    public static long UnixTimeSeconds() => DateTimeOffset.Now.ToUnixTimeSeconds();
+    public static long Timestamp => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-    public static long Timestamp => (long)DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
-
-    public static long TimestampMillis => (long)DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds;
+    public static long TimestampMillis => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 }
 
 // 1397109686193

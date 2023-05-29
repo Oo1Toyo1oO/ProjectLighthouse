@@ -13,7 +13,7 @@ RUN dotnet sln list | grep ".csproj" \
 RUN dotnet restore
 
 COPY . .
-RUN dotnet publish -c Release -o /ProjectLighthouse/publish --no-restore
+RUN dotnet publish -c Release --property:OutputPath=/ProjectLighthouse/publish --no-restore
 
 # Final running container
 FROM mcr.microsoft.com/dotnet/aspnet:7.0-alpine AS final
@@ -24,7 +24,7 @@ adduser -S lighthouse -G lighthouse -h /lighthouse --uid 1001 && \
 mkdir -p /lighthouse/data && \
 mkdir -p /lighthouse/app && \
 mkdir -p /lighthouse/temp && \
-apk add --no-cache icu-libs su-exec
+apk add --no-cache icu-libs su-exec tzdata
 
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 

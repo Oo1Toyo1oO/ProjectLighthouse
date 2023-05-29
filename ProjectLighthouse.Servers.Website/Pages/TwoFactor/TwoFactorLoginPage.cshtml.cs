@@ -1,9 +1,10 @@
 ﻿using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Localization.StringLists;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.TwoFactor;
 
 public class TwoFactorLoginPage : BaseLayout
 {
-    public TwoFactorLoginPage(Database database) : base(database)
+    public TwoFactorLoginPage(DatabaseContext database) : base(database)
     { }
 
     public string Error { get; set; } = "";
@@ -21,14 +22,14 @@ public class TwoFactorLoginPage : BaseLayout
     {
         if (!ServerConfiguration.Instance.TwoFactorConfiguration.TwoFactorEnabled) return this.Redirect("~/login");
 
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
         this.RedirectUrl = redirect ?? "~/";
 
         if (token.Verified) return this.Redirect(this.RedirectUrl);
 
-        User? user = await this.Database.Users.Where(u => u.UserId == token.UserId).FirstOrDefaultAsync();
+        UserEntity? user = await this.Database.Users.Where(u => u.UserId == token.UserId).FirstOrDefaultAsync();
         if (user == null) return this.Redirect("~/login");
 
         if (user.IsTwoFactorSetup) return this.Page();
@@ -42,14 +43,14 @@ public class TwoFactorLoginPage : BaseLayout
     {
         if (!ServerConfiguration.Instance.TwoFactorConfiguration.TwoFactorEnabled) return this.Redirect("~/login");
 
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
         this.RedirectUrl = redirect ?? "~/";
 
         if (token.Verified) return this.Redirect(this.RedirectUrl);
 
-        User? user = await this.Database.Users.Where(u => u.UserId == token.UserId).FirstOrDefaultAsync();
+        UserEntity? user = await this.Database.Users.Where(u => u.UserId == token.UserId).FirstOrDefaultAsync();
         if (user == null) return this.Redirect("~/login");
 
         if (!user.IsTwoFactorSetup)

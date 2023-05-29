@@ -3,9 +3,11 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using LBPUnion.ProjectLighthouse.Administration;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Levels;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Helpers;
@@ -41,7 +43,34 @@ public static class SlotHelper
 
     private static readonly SemaphoreSlim semaphore = new(1, 1);
 
-    public static async Task<int> GetPlaceholderSlotId(Database database, int guid, SlotType slotType)
+    public static async Task<int> GetPlaceholderUserId(DatabaseContext database)
+    {
+        int devCreatorId = await database.Users.Where(u => u.Username.Length == 0)
+            .Select(u => u.UserId)
+            .FirstOrDefaultAsync();
+        if (devCreatorId != 0) return devCreatorId;
+
+        await semaphore.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            UserEntity devCreator = new()
+            {
+                Username = "",
+                PermissionLevel = PermissionLevel.Banned,
+                Biography = "Placeholder author of story levels",
+                BannedReason = "Banned to not show in users list",
+            };
+            database.Users.Add(devCreator);
+            await database.SaveChangesAsync();
+            return devCreator.UserId;
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+    }
+
+    public static async Task<int> GetPlaceholderSlotId(DatabaseContext database, int guid, SlotType slotType)
     {
         int slotId = await database.Slots.Where(s => s.Type == slotType && s.InternalSlotId == guid).Select(s => s.SlotId).FirstOrDefaultAsync();
         if (slotId != 0) return slotId;
@@ -58,39 +87,14 @@ public static class SlotHelper
 
             if (slotId != 0) return slotId;
 
-            Location? devLocation = await database.Locations.FirstOrDefaultAsync(l => l.Id == 1);
-            if (devLocation == null)
-            {
-                devLocation = new Location
-                {
-                    Id = 1,
-                };
-                database.Locations.Add(devLocation);
-            }
+            int devCreatorId = await GetPlaceholderUserId(database);
 
-            int devCreatorId = await database.Users.Where(u => u.Username.Length == 0).Select(u => u.UserId).FirstOrDefaultAsync();
-            if (devCreatorId == 0)
-            {
-                User devCreator = new()
-                {
-                    Username = "",
-                    PermissionLevel = PermissionLevel.Banned,
-                    Biography = "Placeholder author of story levels",
-                    BannedReason = "Banned to not show in users list",
-                    LocationId = devLocation.Id,
-                };
-                database.Users.Add(devCreator);
-                await database.SaveChangesAsync();
-                devCreatorId = devCreator.UserId;
-            }
-
-            Slot slot = new()
+            SlotEntity slot = new()
             {
                 Name = $"{slotType} slot {guid}",
                 Description = $"Placeholder for {slotType} type level",
                 CreatorId = devCreatorId,
                 InternalSlotId = guid,
-                LocationId = devLocation.Id,
                 Type = slotType,
             };
 
@@ -103,5 +107,4 @@ public static class SlotHelper
             semaphore.Release();
         }
     }
-
 }

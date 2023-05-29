@@ -1,7 +1,8 @@
-using LBPUnion.ProjectLighthouse.Administration;
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Moderation;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,10 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Moderation;
 
 public class CasePage : BaseLayout
 {
-    public CasePage(Database database) : base(database)
+    public CasePage(DatabaseContext database) : base(database)
     {}
 
-    public List<ModerationCase> Cases = new();
+    public List<ModerationCaseEntity> Cases = new();
     public int CaseCount;
     public int DismissedCaseCount;
 
@@ -22,7 +23,7 @@ public class CasePage : BaseLayout
 
     public async Task<IActionResult> OnGet([FromRoute] int pageNumber, [FromQuery] string? name)
     {
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null) return this.NotFound();
         if (!user.IsModerator) return this.NotFound();
 

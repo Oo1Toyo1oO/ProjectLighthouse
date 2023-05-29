@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Text;
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.Types;
 
 namespace LBPUnion.ProjectLighthouse.Helpers;
 
@@ -18,15 +17,13 @@ public static class CensorHelper
         "UwU", "OwO", "uwu", "owo", "o3o", ">.>", "*pounces on you*", "*boops*", "*baps*", ":P", "x3", "O_O", "xD", ":3", ";3", "^w^",
     };
 
-    private static readonly string[] censorList = ResourceHelper.ReadManifestFile("chatCensoredList.txt").Replace("\r", "").Split("\n");
-
-    public static string ScanMessage(string message)
+    public static string FilterMessage(string message)
     {
-        if (ServerConfiguration.Instance.UserInputFilterMode == FilterMode.None) return message;
+        if (CensorConfiguration.Instance.UserInputFilterMode == FilterMode.None) return message;
 
-        int profaneIndex = -1;
+        int profaneIndex;
 
-        foreach (string profanity in censorList)
+        foreach (string profanity in CensorConfiguration.Instance.FilteredWordList)
             do
             {
                 profaneIndex = message.ToLower().IndexOf(profanity, StringComparison.Ordinal);
@@ -41,34 +38,13 @@ public static class CensorHelper
     {
         StringBuilder sb = new();
 
-        char prevRandomChar = '\0';
-
         sb.Append(message.AsSpan(0, profanityIndex));
 
-        switch (ServerConfiguration.Instance.UserInputFilterMode)
+        switch (CensorConfiguration.Instance.UserInputFilterMode)
         {
             case FilterMode.Random:
-                for(int i = 0; i < profanityLength; i++)
-                    lock(CryptoHelper.Random)
-                    {
-                        if (message[i] == ' ')
-                        {
-                            sb.Append(' ');
-                        }
-                        else
-                        {
-                            char randomChar = randomCharacters[CryptoHelper.Random.Next(0, randomCharacters.Length - 1)];
-                            if (randomChar == prevRandomChar) randomChar = randomCharacters[CryptoHelper.Random.Next(0, randomCharacters.Length - 1)];
-
-                            prevRandomChar = randomChar;
-
-                            sb.Append(randomChar);
-                        }
-                    }
-
-                break;
-            case FilterMode.Asterisks:
-                for(int i = 0; i < profanityLength; i++)
+                char prevRandomChar = '\0';
+                for (int i = 0; i < profanityLength; i++)
                 {
                     if (message[i] == ' ')
                     {
@@ -76,19 +52,28 @@ public static class CensorHelper
                     }
                     else
                     {
-                        sb.Append('*');
+                        char randomChar = randomCharacters[CryptoHelper.GenerateRandomInt32(0, randomCharacters.Length)];
+                        if (randomChar == prevRandomChar) randomChar = randomCharacters[CryptoHelper.GenerateRandomInt32(0, randomCharacters.Length)];
+
+                        prevRandomChar = randomChar;
+                        sb.Append(randomChar);
                     }
                 }
 
                 break;
-            case FilterMode.Furry:
-                lock(CryptoHelper.Random)
+            case FilterMode.Asterisks:
+                for(int i = 0; i < profanityLength; i++)
                 {
-                    string randomWord = randomFurry[CryptoHelper.Random.Next(0, randomFurry.Length - 1)];
-                    sb.Append(randomWord);
+                    sb.Append(message[i] == ' ' ? ' ' : '*');
                 }
 
                 break;
+            case FilterMode.Furry:
+                string randomWord = randomFurry[CryptoHelper.GenerateRandomInt32(0, randomFurry.Length)];
+                sb.Append(randomWord);
+                break;
+            case FilterMode.None: break;
+            default: throw new ArgumentOutOfRangeException(nameof(message));
         }
 
         sb.Append(message.AsSpan(profanityIndex + profanityLength));
@@ -103,14 +88,10 @@ public static class CensorHelper
         string[] emailArr = email.Split('@');
         string domainExt = Path.GetExtension(email);
 
-        string maskedEmail = string.Format("{0}****{1}@{2}****{3}{4}",
-            emailArr[0][0],
-            emailArr[0].Substring(emailArr[0].Length - 1),
-            emailArr[1][0],
-            emailArr[1]
-                .Substring(emailArr[1].Length - domainExt.Length - 1,
-                    1),
-            domainExt);
+        // Hides everything except the first and last character of the username and domain, preserves the domain extension (.net, .com)
+        string maskedEmail = $"{emailArr[0][0]}****{emailArr[0][^1..]}@{emailArr[1][0]}****{emailArr[1]
+            .Substring(emailArr[1].Length - domainExt.Length - 1,
+                1)}{domainExt}";
 
         return maskedEmail;
     }

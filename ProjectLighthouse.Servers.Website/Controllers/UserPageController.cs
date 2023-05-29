@@ -1,9 +1,10 @@
 #nullable enable
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,9 +14,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Controllers;
 [Route("user/{id:int}")]
 public class UserPageController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public UserPageController(Database database)
+    public UserPageController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -23,7 +24,7 @@ public class UserPageController : ControllerBase
     [HttpGet("rateComment")]
     public async Task<IActionResult> RateComment([FromRoute] int id, [FromQuery] int? commentId, [FromQuery] int? rating)
     {
-        WebToken? token = this.database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
         await this.database.RateComment(token.UserId, commentId.GetValueOrDefault(), rating.GetValueOrDefault());
@@ -34,7 +35,7 @@ public class UserPageController : ControllerBase
     [HttpPost("postComment")]
     public async Task<IActionResult> PostComment([FromRoute] int id, [FromForm] string? msg)
     {
-        WebToken? token = this.database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
         if (msg == null)
@@ -43,10 +44,17 @@ public class UserPageController : ControllerBase
             return this.Redirect("~/user/" + id);
         }
 
-        msg = SanitizationHelper.SanitizeString(msg);
+        msg = CensorHelper.FilterMessage(msg);
 
-        await this.database.PostComment(token.UserId, id, CommentType.Profile, msg);
-        Logger.Success($"Posted comment from {token.UserId}: \"{msg}\" on user {id}", LogArea.Comments);
+        bool success = await this.database.PostComment(token.UserId, id, CommentType.Profile, msg);
+        if (success)
+        {
+            Logger.Success($"Posted comment from {token.UserId}: \"{msg}\" on user {id}", LogArea.Comments);
+        }
+        else
+        {
+            Logger.Error($"Failed to post comment from {token.UserId}: \"{msg}\" on user {id}", LogArea.Comments);
+        }
 
         return this.Redirect("~/user/" + id);
     }
@@ -54,10 +62,10 @@ public class UserPageController : ControllerBase
     [HttpGet("heart")]
     public async Task<IActionResult> HeartUser([FromRoute] int id)
     {
-        WebToken? token = this.database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
-        User? heartedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        UserEntity? heartedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (heartedUser == null) return this.NotFound();
 
         await this.database.HeartUser(token.UserId, heartedUser);
@@ -68,13 +76,41 @@ public class UserPageController : ControllerBase
     [HttpGet("unheart")]
     public async Task<IActionResult> UnheartUser([FromRoute] int id)
     {
-        WebToken? token = this.database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("~/login");
 
-        User? heartedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        UserEntity? heartedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
         if (heartedUser == null) return this.NotFound();
 
         await this.database.UnheartUser(token.UserId, heartedUser);
+
+        return this.Redirect("~/user/" + id);
+    }
+
+    [HttpGet("block")]
+    public async Task<IActionResult> BlockUser([FromRoute] int id)
+    {
+        WebTokenEntity? token = this.database.WebTokenFromRequest(this.Request);
+        if (token == null) return this.Redirect("~/login");
+
+        UserEntity? blockedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        if (blockedUser == null) return this.NotFound();
+
+        await this.database.BlockUser(token.UserId, blockedUser);
+
+        return this.Redirect("~/user/" + id);
+    }
+
+    [HttpGet("unblock")]
+    public async Task<IActionResult> UnblockUser([FromRoute] int id)
+    {
+        WebTokenEntity? token = this.database.WebTokenFromRequest(this.Request);
+        if (token == null) return this.Redirect("~/login");
+
+        UserEntity? blockedUser = await this.database.Users.FirstOrDefaultAsync(u => u.UserId == id);
+        if (blockedUser == null) return this.NotFound();
+
+        await this.database.UnblockUser(token.UserId, blockedUser);
 
         return this.Redirect("~/user/" + id);
     }

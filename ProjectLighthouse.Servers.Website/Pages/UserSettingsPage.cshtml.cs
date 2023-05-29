@@ -1,11 +1,12 @@
 ﻿#nullable enable
 using System.Diagnostics.CodeAnalysis;
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Files;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Localization;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,8 +15,8 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages;
 public class UserSettingsPage : BaseLayout
 {
 
-    public User? ProfileUser;
-    public UserSettingsPage(Database database) : base(database)
+    public UserEntity? ProfileUser;
+    public UserSettingsPage(DatabaseContext database) : base(database)
     {}
 
     [SuppressMessage("ReSharper", "SpecifyStringComparison")]
@@ -32,9 +33,12 @@ public class UserSettingsPage : BaseLayout
 
         if (avatarHash != null) this.ProfileUser.IconHash = avatarHash;
 
-        biography = SanitizationHelper.SanitizeString(biography);
-
-        if (this.ProfileUser.Biography != biography && biography.Length <= 512) this.ProfileUser.Biography = biography;
+        if (biography != null)
+        {
+            biography = CensorHelper.FilterMessage(biography);
+            if (this.ProfileUser.Biography != biography && biography.Length <= 512)
+                this.ProfileUser.Biography = biography;
+        }
 
         if (ServerConfiguration.Instance.Mail.MailEnabled &&
             SanitizationHelper.IsValidEmail(email) &&

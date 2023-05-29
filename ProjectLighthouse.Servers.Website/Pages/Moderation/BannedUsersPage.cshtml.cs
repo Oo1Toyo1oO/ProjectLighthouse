@@ -1,19 +1,19 @@
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Moderation;
 
 public class BannedUsersPage : BaseLayout
 {
-    public BannedUsersPage(Database database) : base(database)
+    public BannedUsersPage(DatabaseContext database) : base(database)
     {}
 
-    public List<User> Users = new();
+    public List<UserEntity> Users = new();
 
     public int PageAmount;
 
@@ -23,7 +23,7 @@ public class BannedUsersPage : BaseLayout
 
     public async Task<IActionResult> OnGet([FromRoute] int pageNumber, [FromQuery] string? name)
     {
-        WebToken? token = this.Database.WebTokenFromRequest(this.Request);
+        WebTokenEntity? token = this.Database.WebTokenFromRequest(this.Request);
         if (token == null) return this.Redirect("/login");
 
         this.Users = await this.Database.Users

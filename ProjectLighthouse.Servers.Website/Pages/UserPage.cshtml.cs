@@ -1,10 +1,12 @@
 #nullable enable
 using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Interaction;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Levels;
+using LBPUnion.ProjectLighthouse.Types.Users;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,20 +14,22 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages;
 
 public class UserPage : BaseLayout
 {
-    public List<Comment>? Comments;
+    public Dictionary<CommentEntity, RatedCommentEntity?> Comments = new();
 
     public bool CommentsEnabled;
 
     public bool IsProfileUserHearted;
 
-    public List<Photo>? Photos;
-    public List<Slot>? Slots;
+    public bool IsProfileUserBlocked;
 
-    public List<Slot>? HeartedSlots;
-    public List<Slot>? QueuedSlots;
+    public List<PhotoEntity>? Photos;
+    public List<SlotEntity>? Slots;
 
-    public User? ProfileUser;
-    public UserPage(Database database) : base(database)
+    public List<SlotEntity>? HeartedSlots;
+    public List<SlotEntity>? QueuedSlots;
+
+    public UserEntity? ProfileUser;
+    public UserPage(DatabaseContext database) : base(database)
     {}
 
     public async Task<IActionResult> OnGet([FromRoute] int userId)
@@ -56,6 +60,8 @@ public class UserPage : BaseLayout
         }
 
         this.Photos = await this.Database.Photos.Include(p => p.Slot)
+            .Include(p => p.PhotoSubjects)
+            .ThenInclude(ps => ps.User)
             .OrderByDescending(p => p.Timestamp)
             .Where(p => p.CreatorId == userId)
             .Take(6)
@@ -86,27 +92,34 @@ public class UserPage : BaseLayout
         }
 
         this.CommentsEnabled = ServerConfiguration.Instance.UserGeneratedContentLimits.LevelCommentsEnabled && this.ProfileUser.CommentsEnabled;
+
         if (this.CommentsEnabled)
         {
+            List<int> blockedUsers = this.User == null ? new List<int>() : await 
+            (from blockedProfile in this.Database.BlockedProfiles
+                where blockedProfile.UserId == this.User.UserId
+                select blockedProfile.BlockedUserId).ToListAsync();
+            
             this.Comments = await this.Database.Comments.Include(p => p.Poster)
                 .OrderByDescending(p => p.Timestamp)
                 .Where(p => p.TargetId == userId && p.Type == CommentType.Profile)
+                .Where(p => !blockedUsers.Contains(p.PosterUserId))
                 .Take(50)
-                .ToListAsync();
+                .ToDictionaryAsync(c => c, _ => (RatedCommentEntity?) null);
         }
         else
         {
-            this.Comments = new List<Comment>();
+            this.Comments = new Dictionary<CommentEntity, RatedCommentEntity?>();
         }
 
         if (this.User == null) return this.Page();
 
-        foreach (Comment c in this.Comments)
+        foreach (KeyValuePair<CommentEntity, RatedCommentEntity?> kvp in this.Comments)
         {
-            Reaction? reaction = await this.Database.Reactions.Where(r => r.TargetId == c.TargetId)
+            RatedCommentEntity? reaction = await this.Database.RatedComments.Where(r => r.CommentId == kvp.Key.CommentId)
                 .Where(r => r.UserId == this.User.UserId)
                 .FirstOrDefaultAsync();
-            if (reaction != null) c.YourThumb = reaction.Rating;
+            this.Comments[kvp.Key] = reaction;
         }
 
         this.IsProfileUserHearted = await this.Database.HeartedProfiles
@@ -114,6 +127,8 @@ public class UserPage : BaseLayout
             .Where(h => h.UserId == this.User.UserId)
             .AnyAsync();
 
+        this.IsProfileUserBlocked = await this.Database.IsUserBlockedBy(this.ProfileUser.UserId, this.User.UserId);
+        
         return this.Page();
     }
 }

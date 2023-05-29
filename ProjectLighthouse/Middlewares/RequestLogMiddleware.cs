@@ -1,7 +1,9 @@
 using System.Diagnostics;
-using System.IO;
+using System.Text;
 using System.Threading.Tasks;
+using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Logging;
+using LBPUnion.ProjectLighthouse.Types.Logging;
 using Microsoft.AspNetCore.Http;
 
 namespace LBPUnion.ProjectLighthouse.Middlewares;
@@ -22,7 +24,7 @@ public class RequestLogMiddleware : Middleware
         ctx.Request.EnableBuffering(); // Allows us to reset the position of Request.Body for later logging
 
         // Log all headers.
-//                    foreach (KeyValuePair<string, StringValues> header in context.Request.Headers) Logger.Log($"{header.Key}: {header.Value}");
+        // foreach (KeyValuePair<string, StringValues> header in ctx.Request.Headers) Logger.Debug($"{header.Key}: {header.Value}", LogArea.HTTP);
 
         await this.next(ctx); // Handle the request so we can get the status code from it
 
@@ -38,8 +40,8 @@ public class RequestLogMiddleware : Middleware
         // Log post body
         if (ctx.Request.Method == "POST")
         {
-            ctx.Request.Body.Position = 0;
-            Logger.Debug(await new StreamReader(ctx.Request.Body).ReadToEndAsync(), LogArea.HTTP);
+            string body = Encoding.ASCII.GetString(await ctx.Request.BodyReader.ReadAllAsync());
+            Logger.Debug(body, LogArea.HTTP);
         }
         #endif
     }

@@ -1,10 +1,11 @@
 ﻿using LBPUnion.ProjectLighthouse.Helpers;
 using Microsoft.EntityFrameworkCore.Migrations;
 using LBPUnion.ProjectLighthouse;
+using LBPUnion.ProjectLighthouse.Database;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 namespace ProjectLighthouse.Migrations
 {
-    [DbContext(typeof(Database))]
+    [DbContext(typeof(DatabaseContext))]
     [Migration("20211028015915_AddSlotTimestamp")]
     public partial class AddSlotTimestamp : Migration
     {
@@ -15,7 +16,7 @@ namespace ProjectLighthouse.Migrations
                 table: "Slots",
                 type: "bigint",
                 nullable: false,
-                defaultValue: TimeHelper.UnixTimeMilliseconds());
+                defaultValue: TimeHelper.TimestampMillis);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

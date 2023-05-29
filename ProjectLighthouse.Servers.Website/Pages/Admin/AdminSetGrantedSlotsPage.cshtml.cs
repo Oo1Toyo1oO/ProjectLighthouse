@@ -1,7 +1,7 @@
 #nullable enable
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,14 +9,14 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Admin;
 
 public class AdminSetGrantedSlotsPage : BaseLayout
 {
-    public AdminSetGrantedSlotsPage(Database database) : base(database)
+    public AdminSetGrantedSlotsPage(DatabaseContext database) : base(database)
     {}
 
-    public User? TargetedUser;
+    public UserEntity? TargetedUser;
 
     public async Task<IActionResult> OnGet([FromRoute] int id)
     {
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null || !user.IsAdmin) return this.NotFound();
 
         this.TargetedUser = await this.Database.Users.FirstOrDefaultAsync(u => u.UserId == id);
@@ -27,7 +27,7 @@ public class AdminSetGrantedSlotsPage : BaseLayout
 
     public async Task<IActionResult> OnPost([FromRoute] int id, int grantedSlotCount)
     {
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null || !user.IsAdmin) return this.NotFound();
 
         this.TargetedUser = await this.Database.Users.FirstOrDefaultAsync(u => u.UserId == id);

@@ -1,8 +1,9 @@
 ﻿#nullable enable
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Files;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.Levels;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,8 +12,8 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages;
 public class SlotSettingsPage : BaseLayout
 {
 
-    public Slot? Slot;
-    public SlotSettingsPage(Database database) : base(database)
+    public SlotEntity? Slot;
+    public SlotSettingsPage(DatabaseContext database) : base(database)
     {}
 
     public async Task<IActionResult> OnPost([FromRoute] int slotId, [FromForm] string? avatar, [FromForm] string? name, [FromForm] string? description, string? labels)
@@ -28,14 +29,26 @@ public class SlotSettingsPage : BaseLayout
 
         if (avatarHash != null) this.Slot.IconHash = avatarHash;
 
-        name = SanitizationHelper.SanitizeString(name);
-        if (this.Slot.Name != name && name.Length <= 64) this.Slot.Name = name;
+        if (name != null)
+        {
+            name = CensorHelper.FilterMessage(name);
+            if (this.Slot.Name != name && name.Length <= 64)
+                this.Slot.Name = name;
+        }
 
-        description = SanitizationHelper.SanitizeString(description);
-        if (this.Slot.Description != description && description.Length <= 512) this.Slot.Description = description;
+        if (description != null)
+        {
+            description = CensorHelper.FilterMessage(description);
+            if (this.Slot.Description != description && description?.Length <= 512)
+                this.Slot.Description = description;
+        }
 
-        labels = LabelHelper.RemoveInvalidLabels(SanitizationHelper.SanitizeString(labels));
-        if (this.Slot.AuthorLabels != labels) this.Slot.AuthorLabels = labels;
+        if (labels != null)
+        {
+            labels = LabelHelper.RemoveInvalidLabels(labels);
+            if (this.Slot.AuthorLabels != labels) 
+                this.Slot.AuthorLabels = labels;
+        }
 
         // ReSharper disable once InvertIf
         if (this.Database.ChangeTracker.HasChanges())

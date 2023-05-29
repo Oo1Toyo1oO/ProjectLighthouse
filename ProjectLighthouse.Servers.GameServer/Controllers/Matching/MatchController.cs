@@ -1,13 +1,15 @@
 #nullable enable
 using System.Text.Json;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.Match;
-using LBPUnion.ProjectLighthouse.Match.MatchCommands;
-using LBPUnion.ProjectLighthouse.Match.Rooms;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Matchmaking;
+using LBPUnion.ProjectLighthouse.Types.Matchmaking.MatchCommands;
+using LBPUnion.ProjectLighthouse.Types.Matchmaking.Rooms;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,9 +22,9 @@ namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers.Matching;
 [Produces("text/xml")]
 public class MatchController : ControllerBase
 {
-    private readonly Database database;
+    private readonly DatabaseContext database;
 
-    public MatchController(Database database)
+    public MatchController(DatabaseContext database)
     {
         this.database = database;
     }
@@ -35,20 +37,20 @@ public class MatchController : ControllerBase
     [Produces("text/plain")]
     public async Task<IActionResult> Match()
     {
-        GameToken token = this.GetToken();
+        GameTokenEntity token = this.GetToken();
 
-        User? user = await this.database.UserFromGameToken(token);
-        if (user == null) return this.StatusCode(403, "");
+        UserEntity? user = await this.database.UserFromGameToken(token);
+        if (user == null) return this.Forbid();
 
         #region Parse match data
 
         // Example POST /match: [UpdateMyPlayerData,["Player":"FireGamer9872"]]
 
-        string bodyString = await new StreamReader(this.Request.Body).ReadToEndAsync();
+        string bodyString = await this.ReadBodyAsync();
 
         if (bodyString.Length == 0 || bodyString[0] != '[') return this.BadRequest();
 
-        Logger.Info("Received match data: " + bodyString, LogArea.Match);
+        Logger.Debug("Received match data: " + bodyString, LogArea.Match);
 
         IMatchCommand? matchData;
         try
@@ -57,7 +59,7 @@ public class MatchController : ControllerBase
         }
         catch(Exception e)
         {
-            Logger.Error("Exception while parsing matchData: ", LogArea.Match);
+            Logger.Error($"Exception while parsing matchData: body='{bodyString}'", LogArea.Match);
             Logger.Error(e.ToDetailedException(), LogArea.Match);
 
             return this.BadRequest();
@@ -65,7 +67,7 @@ public class MatchController : ControllerBase
 
         if (matchData == null)
         {
-            Logger.Error($"Could not parse match data: {nameof(matchData)} is null", LogArea.Match);
+            Logger.Error($"Could not parse match data: {nameof(matchData)} is null, body='{bodyString}'", LogArea.Match);
             return this.BadRequest();
         }
 
@@ -111,7 +113,7 @@ public class MatchController : ControllerBase
                 List<int> users = new();
                 foreach (string playerUsername in createRoom.Players)
                 {
-                    User? player = await this.database.Users.FirstOrDefaultAsync(u => u.Username == playerUsername);
+                    UserEntity? player = await this.database.Users.FirstOrDefaultAsync(u => u.Username == playerUsername);
                     // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                     if (player != null) users.Add(player.UserId);
                     else return this.BadRequest();
@@ -127,10 +129,10 @@ public class MatchController : ControllerBase
 
                 if (room != null)
                 {
-                    List<User> users = new();
+                    List<UserEntity> users = new();
                     foreach (string playerUsername in updatePlayersInRoom.Players)
                     {
-                        User? player = await this.database.Users.FirstOrDefaultAsync(u => u.Username == playerUsername);
+                        UserEntity? player = await this.database.Users.FirstOrDefaultAsync(u => u.Username == playerUsername);
                         // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                         if (player != null) users.Add(player);
                         else return this.BadRequest();

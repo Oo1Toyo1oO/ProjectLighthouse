@@ -1,7 +1,7 @@
 @page "/users/{pageNumber:int}"
 @using LBPUnion.ProjectLighthouse.Extensions
 @using LBPUnion.ProjectLighthouse.Localization.StringLists
-@using LBPUnion.ProjectLighthouse.PlayerData.Profiles
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.UsersPage
 
 @{
@@ -20,7 +20,7 @@
 </form>
 <div class="ui divider"></div>
 
-@foreach (User user in Model.Users)
+@foreach (UserEntity user in Model.Users)
 {
     <div class="ui segment">
         @await Html.PartialAsync("Partials/UserCardPartial", user, new ViewDataDictionary(ViewData)

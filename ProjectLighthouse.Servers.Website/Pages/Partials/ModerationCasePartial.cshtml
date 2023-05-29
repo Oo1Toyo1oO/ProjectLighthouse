@@ -1,12 +1,12 @@
 @using System.Diagnostics
-@using LBPUnion.ProjectLighthouse
-@using LBPUnion.ProjectLighthouse.Administration
-@using LBPUnion.ProjectLighthouse.Levels
-@using LBPUnion.ProjectLighthouse.PlayerData.Profiles
-@model LBPUnion.ProjectLighthouse.Administration.ModerationCase
+@using LBPUnion.ProjectLighthouse.Database
+@using LBPUnion.ProjectLighthouse.Types.Entities.Level
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
+@using LBPUnion.ProjectLighthouse.Types.Moderation.Cases
+@model LBPUnion.ProjectLighthouse.Types.Entities.Moderation.ModerationCaseEntity
 
 @{
-    Database database = new();
+    DatabaseContext database = DatabaseContext.CreateNewInstance();
     string color = "blue";
 
     string timeZone = (string?)ViewData["TimeZone"] ?? TimeZoneInfo.Local.Id;
@@ -21,28 +21,56 @@
     
     @if (Model.Dismissed)
     {
-        Debug.Assert(Model.Dismisser != null);
         Debug.Assert(Model.DismissedAt != null);
+
+        @if (Model.Dismisser != null)
+        {
+            <h3 class="ui @color header">
+                This case was dismissed by <a href="/user/@Model.Dismisser.UserId">@Model.DismisserUsername</a> on @TimeZoneInfo.ConvertTime(Model.DismissedAt.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt").
+            </h3>
+        }
+        else
+        {
+            <h3 class="ui @color header">
+                This case was dismissed by @Model.DismisserUsername on @TimeZoneInfo.ConvertTime(Model.DismissedAt.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt").
+            </h3>
+        }
         
-        <h3 class="ui @color header">
-            This case was dismissed by <a href="/user/@Model.Dismisser.UserId">@Model.Dismisser.Username</a> on @TimeZoneInfo.ConvertTime(Model.DismissedAt.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt").
-        </h3>
     }
-    else if (Model.Expired && Model.ExpiresAt != null)
+    else if (Model.Expired)
     {
         <h3 class="ui @color header">
-            This case expired on @TimeZoneInfo.ConvertTime(Model.ExpiresAt.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt").
+            This case expired on @TimeZoneInfo.ConvertTime(Model.ExpiresAt!.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt").
         </h3>
     }
+
+    @if (Model.Creator != null && Model.Creator.Username.Length != 0)
+    {
+        <span>
+            Case created by <a href="/user/@Model.Creator.UserId">@Model.Creator.Username</a>
+            on @TimeZoneInfo.ConvertTime(Model.CreatedAt, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt")
+            @if (Model.ExpiresAt != null)
+            {
+                <span>until @TimeZoneInfo.ConvertTime(Model.ExpiresAt!.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt")</span>
+            }
+        </span><br>
+    }
+    else
+    {
+        <span>
+            Case created by @Model.CreatorUsername
+            on @TimeZoneInfo.ConvertTime(Model.CreatedAt, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt")
+            @if (Model.ExpiresAt != null)
+            {
+                <span>until @TimeZoneInfo.ConvertTime(Model.ExpiresAt!.Value, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt")</span>
+            }
+        </span><br>
+    }
     
-    <span>
-        Case created by <a href="/user/@Model.Creator!.UserId">@Model.Creator.Username</a>
-        on @TimeZoneInfo.ConvertTime(Model.CreatedAt, timeZoneInfo).ToString("M/d/yyyy @ h:mm tt")
-    </span><br>
     
     @if (Model.Type.AffectsLevel())
     {
-        Slot? slot = await Model.GetSlotAsync(database);
+        SlotEntity? slot = await Model.GetSlotAsync(database);
         if (slot != null)
         {
             <p><strong>Affected level:</strong> <a href="/slot/@slot.SlotId">@slot.Name</a></p>
@@ -50,7 +78,7 @@
     }
     else if (Model.Type.AffectsUser())
     {
-        User? user = await Model.GetUserAsync(database);
+        UserEntity? user = await Model.GetUserAsync(database);
         if (user != null)
         {
             <p><strong>Affected user:</strong> <a href="/user/@user.UserId">@user.Username</a></p>
@@ -60,7 +88,7 @@
     <h3>Reason</h3>
     @if (!string.IsNullOrWhiteSpace(Model.Reason))
     {
-        <pre>@Model.Reason</pre>
+        <pre style="white-space: initial;">@Model.Reason</pre>
     }
     else
     {
@@ -70,7 +98,7 @@
     <h3>Moderator Notes</h3>
     @if (!string.IsNullOrWhiteSpace(Model.ModeratorNotes))
     {
-        <pre>@Model.ModeratorNotes</pre>
+        <pre style="white-space: initial;">@Model.ModeratorNotes</pre>
     }
     else
     {

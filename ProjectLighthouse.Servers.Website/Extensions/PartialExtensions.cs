@@ -1,6 +1,5 @@
-using LBPUnion.ProjectLighthouse.Levels;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Types.Entities.Level;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -33,15 +32,15 @@ public static class PartialExtensions
         }
     }
 
-    public static Task<IHtmlContent> ToLink<T>(this User user, IHtmlHelper<T> helper, ViewDataDictionary<T> viewData, string language, string timeZone = "", bool includeStatus = false) 
+    public static Task<IHtmlContent> ToLink<T>(this UserEntity user, IHtmlHelper<T> helper, ViewDataDictionary<T> viewData, string language, string timeZone = "", bool includeStatus = false) 
         => helper.PartialAsync("Partials/Links/UserLinkPartial", user, viewData.WithLang(language).WithTime(timeZone).WithKeyValue("IncludeStatus", includeStatus));
 
     public static Task<IHtmlContent> ToHtml<T>
     (
-        this Slot slot,
+        this SlotEntity slot,
         IHtmlHelper<T> helper,
         ViewDataDictionary<T> viewData,
-        User? user,
+        UserEntity? user,
         string callbackUrl,
         string language = "",
         string timeZone = "",
@@ -56,6 +55,6 @@ public static class PartialExtensions
                 .WithKeyValue("IsMini", isMini)
                 .WithKeyValue("IsMobile", isMobile));
 
-    public static Task<IHtmlContent> ToHtml<T>(this Photo photo, IHtmlHelper<T> helper, ViewDataDictionary<T> viewData, string language, string timeZone, bool canDelete = false)
+    public static Task<IHtmlContent> ToHtml<T>(this PhotoEntity photo, IHtmlHelper<T> helper, ViewDataDictionary<T> viewData, string language, string timeZone, bool canDelete = false)
         => helper.PartialAsync("Partials/PhotoPartial", photo, viewData.WithLang(language).WithTime(timeZone).CanDelete(canDelete));
 }

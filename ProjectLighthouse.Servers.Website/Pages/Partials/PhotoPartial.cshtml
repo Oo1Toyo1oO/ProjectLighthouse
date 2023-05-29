@@ -1,9 +1,10 @@
 @using System.Web
-@using LBPUnion.ProjectLighthouse.Levels
 @using LBPUnion.ProjectLighthouse.Localization
-@using LBPUnion.ProjectLighthouse.PlayerData
 @using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
-@model LBPUnion.ProjectLighthouse.PlayerData.Photo
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
+@using LBPUnion.ProjectLighthouse.Types.Levels
+@using LBPUnion.ProjectLighthouse.Types.Serialization
+@model LBPUnion.ProjectLighthouse.Types.Entities.Profile.PhotoEntity
 
 @{
     string language = (string?)ViewData["Language"] ?? LocalizationManager.DefaultLang;
@@ -76,22 +77,24 @@
     </i>
 </p>
 
-@if (Model.Subjects.Count > 0)
+@if (Model.PhotoSubjects.Count > 0)
 {
     <p>
-        <b>Photo contains @Model.Subjects.Count @(Model.Subjects.Count == 1 ? "person" : "people"):</b>
+        <b>Photo contains @Model.PhotoSubjects.Count @(Model.PhotoSubjects.Count == 1 ? "person" : "people"):</b>
     </p>
 }
 <div id="hover-subjects-@Model.PhotoId">
-    @foreach (PhotoSubject subject in Model.Subjects)
+    @foreach (PhotoSubjectEntity subject in Model.PhotoSubjects)
     {
         @await subject.User.ToLink(Html, ViewData, language, timeZone)
     }
 </div>
-
 @{
-    PhotoSubject[] subjects = Model.Subjects.ToArray();
-    foreach (PhotoSubject subject in subjects) subject.Username = subject.User.Username;
+    GamePhotoSubject[] subjects = Model.PhotoSubjects.Select(GamePhotoSubject.CreateFromEntity).ToArray();
+    foreach (GamePhotoSubject subject in subjects)
+    {
+        subject.Username = Model.PhotoSubjects.Where(ps => ps.UserId == subject.UserId).Select(ps => ps.User.Username).First();
+    }
 }
 
 <script>

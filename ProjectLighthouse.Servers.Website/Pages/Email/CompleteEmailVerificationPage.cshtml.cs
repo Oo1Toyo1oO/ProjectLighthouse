@@ -1,10 +1,10 @@
 #nullable enable
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.PlayerData;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles.Email;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +12,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Email;
 
 public class CompleteEmailVerificationPage : BaseLayout
 {
-    public CompleteEmailVerificationPage(Database database) : base(database)
+    public CompleteEmailVerificationPage(DatabaseContext database) : base(database)
     {}
 
     public string? Error;
@@ -21,14 +21,14 @@ public class CompleteEmailVerificationPage : BaseLayout
     {
         if (!ServerConfiguration.Instance.Mail.MailEnabled) return this.NotFound();
 
-        EmailVerificationToken? emailVerifyToken = await this.Database.EmailVerificationTokens.FirstOrDefaultAsync(e => e.EmailToken == token);
+        EmailVerificationTokenEntity? emailVerifyToken = await this.Database.EmailVerificationTokens.FirstOrDefaultAsync(e => e.EmailToken == token);
         if (emailVerifyToken == null)
         {
             this.Error = "Invalid verification token";
             return this.Page();
         }
 
-        User user = await this.Database.Users.FirstAsync(u => u.UserId == emailVerifyToken.UserId);
+        UserEntity user = await this.Database.Users.FirstAsync(u => u.UserId == emailVerifyToken.UserId);
 
         if (DateTime.Now > emailVerifyToken.ExpiresAt)
         {
@@ -50,7 +50,7 @@ public class CompleteEmailVerificationPage : BaseLayout
         if (user.Password != null) return this.Page();
 
         // if user's account was created automatically
-        WebToken webToken = new()
+        WebTokenEntity webToken = new()
         {
             ExpiresAt = DateTime.Now.AddDays(7),
             Verified = true,

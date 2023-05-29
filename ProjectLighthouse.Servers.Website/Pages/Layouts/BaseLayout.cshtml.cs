@@ -1,9 +1,10 @@
 #nullable enable
 using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Localization;
 using LBPUnion.ProjectLighthouse.Localization.StringLists;
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Servers.Website.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -11,7 +12,7 @@ namespace LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
 
 public class BaseLayout : PageModel
 {
-    public readonly Database Database;
+    public readonly DatabaseContext Database;
 
     public readonly List<PageNavigationItem> NavigationItems = new();
 
@@ -24,8 +25,8 @@ public class BaseLayout : PageModel
 
     public string Title = string.Empty;
 
-    private User? user;
-    public BaseLayout(Database database)
+    private UserEntity? user;
+    public BaseLayout(DatabaseContext database)
     {
         this.Database = database;
         
@@ -34,7 +35,7 @@ public class BaseLayout : PageModel
         this.NavigationItems.Add(new PageNavigationItem(BaseLayoutStrings.HeaderSlots, "/slots/0", "globe americas"));
     }
 
-    public new User? User {
+    public new UserEntity? User {
         get {
             if (this.user != null) return this.user;
 

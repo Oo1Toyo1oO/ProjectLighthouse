@@ -1,7 +1,7 @@
 #nullable enable
-using LBPUnion.ProjectLighthouse.PlayerData.Profiles;
+using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Servers.Website.Pages.Layouts;
-using LBPUnion.ProjectLighthouse.Types;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,13 +11,13 @@ public class AdminPanelUsersPage : BaseLayout
 {
     public int UserCount;
 
-    public List<User> Users = new();
-    public AdminPanelUsersPage(Database database) : base(database)
+    public List<UserEntity> Users = new();
+    public AdminPanelUsersPage(DatabaseContext database) : base(database)
     {}
 
     public async Task<IActionResult> OnGet()
     {
-        User? user = this.Database.UserFromWebRequest(this.Request);
+        UserEntity? user = this.Database.UserFromWebRequest(this.Request);
         if (user == null) return this.Redirect("~/login");
         if (!user.IsAdmin) return this.NotFound();
 
