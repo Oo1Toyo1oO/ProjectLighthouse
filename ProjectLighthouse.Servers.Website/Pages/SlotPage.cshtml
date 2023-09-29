@@ -9,6 +9,7 @@
 @using LBPUnion.ProjectLighthouse.Types.Moderation.Cases
 @using LBPUnion.ProjectLighthouse.Types.Users
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.SlotPage
+@inject DatabaseContext Database
 
 @{
     Layout = "Layouts/BaseLayout";
@@ -25,141 +26,171 @@
 @if (Model.Slot!.Hidden)
 {
     <div class="ui inverted red segment">
-        <h2>This level is currently hidden.</h2>
-        <p><b>Only you and moderators may view this level.</b></p>
-        
-        <b>Reason:</b> <span>"@Model.Slot.HiddenReason"</span>
-        
-        <p><b>For more information please contact a moderator.</b></p>
+        <h3><i class="ban icon"></i> This level is currently hidden.</h3>
+        @if (Model.User != null && Model.User.IsModerator)
+        {
+            <b>Reason:</b>
+            <span>"@Model.Slot.HiddenReason"</span>
+        }
+        else
+        {
+            <p>This level has been hidden for violating the Terms of Service. Remember to follow the rules!</p>
+        }
+    </div>
+}
+
+@if (Model.Slot!.LockedByModerator)
+{
+    <div class="ui inverted red segment">
+        <h3><i class="lock icon"></i> This level has been locked by a moderator.</h3>
+        @if (Model.User != null && Model.User.IsModerator)
+        {
+            <b>Reason:</b>
+            <span>"@Model.Slot.LockedReason"</span>
+        }
+        else
+        {
+            <p>This level has been locked for violating the Terms of Service. Remember to follow the rules!</p>
+        }
     </div>
 }
 
 @await Model.Slot.ToHtml(Html, ViewData, Model.User, $"~/slot/{Model.Slot?.SlotId}", language, timeZone, isMobile)
 <br>
 
-<div class="@(isMobile ? "" : "ui grid")">
-    <div class="eight wide column">
-        <div class="ui blue segment">
-            <h2>Description</h2>
-            <p style="overflow-wrap: anywhere">@HttpUtility.HtmlDecode(string.IsNullOrEmpty(Model.Slot?.Description) ? "This level has no description." : Model.Slot.Description)</p>
-        </div>
+@if (!Model.CanViewSlot)
+{
+    <div class="ui red segment">
+        <p>
+            <i>The creator's privacy settings prevent you from viewing this page.</i>
+        </p>
     </div>
-    @if (isMobile)
-    {
-        <br/>
-    }
-    <div class="eight wide column">
-        <div class="ui red segment">
-            <h2>Tags</h2>
-            @{
-                string[] authorLabels;
-                if (Model.Slot?.GameVersion == GameVersion.LittleBigPlanet1)
-                {
-                    authorLabels = Model.Slot.LevelTags(DatabaseContext.CreateNewInstance());
-                }
-                else
-                {
-                    authorLabels = Model.Slot?.AuthorLabels.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-                }
-                if (authorLabels.Length == 0)
-                {
-                    <p>This level has no tags.</p>
-                }
-                else
-                {
-                    foreach (string label in authorLabels.Where(label => !string.IsNullOrEmpty(label)))
+}
+else
+{
+    <div class="@(isMobile ? "" : "ui grid")">
+        <div class="eight wide column">
+            <div class="ui blue segment">
+                <h2>Description</h2>
+                <p style="overflow-wrap: anywhere">@HttpUtility.HtmlDecode(string.IsNullOrEmpty(Model.Slot?.Description) ? "This level has no description." : Model.Slot.Description)</p>
+            </div>
+        </div>
+        @if (isMobile)
+        {
+            <br/>
+        }
+        <div class="eight wide column">
+            <div class="ui red segment">
+                <h2>Tags</h2>
+                @{
+                    string[] authorLabels;
+                    if (Model.Slot?.GameVersion == GameVersion.LittleBigPlanet1)
                     {
-                        <div class="ui blue label">@LabelHelper.TranslateTag(label)</div>
+                        authorLabels = Model.Slot.LevelTags(Database);
                     }
-                }
-            }
-        </div>
-    </div>
-    @if (isMobile)
-    {
-        <br/>
-    }
-</div>
-    
-<div class="ui grid">
-    @{
-        string outerDiv = isMobile ?
-            "horizontal-scroll" :
-            "three wide column";
-        string innerDiv = isMobile ?
-            "ui top attached tabular menu horizontal-scroll" :
-            "ui vertical fluid tabular menu";
-    }
-    <div class="@outerDiv">
-        <div class="@innerDiv">
-            <a class="item active lh-sidebar" target="lh-comments">
-                Comments
-            </a>
-            <a class="item lh-sidebar" target="lh-photos">
-                @Model.Translate(BaseLayoutStrings.HeaderPhotos)
-            </a>
-            <a class="item lh-sidebar" target="lh-reviews">
-                Reviews
-            </a>
-            <a class="item lh-sidebar" target="lh-scores">
-                Scores
-            </a>
-        </div>
-    </div>
-
-    @{
-        string divLength = isMobile ? "sixteen" : "thirteen";
-    }
-    <div class="@divLength wide stretched column">
-        <div class="lh-content" id="lh-comments">
-            @await Html.PartialAsync("Partials/CommentsPartial", new ViewDataDictionary(ViewData.WithLang(language).WithTime(timeZone))
-                   { { "PageOwner", Model.Slot?.CreatorId }, })
-        </div>
-        <div class="lh-content" id="lh-photos">
-            <div class="ui purple segment" id="photos">
-                @if (Model.Photos.Count != 0)
-                {
-                    <div class="ui center aligned grid">
-                        @foreach (PhotoEntity photo in Model.Photos)
+                    else
+                    {
+                        authorLabels = Model.Slot?.AuthorLabels.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                    }
+                    if (authorLabels.Length == 0)
+                    {
+                        <p>This level has no tags.</p>
+                    }
+                    else
+                    {
+                        foreach (string label in authorLabels.Where(label => !string.IsNullOrEmpty(label)))
                         {
-                            string width = isMobile ? "sixteen" : "eight";
-                            bool canDelete = Model.User != null && (Model.User.IsModerator || Model.User.UserId == photo.CreatorId);
-                            <div class="@width wide column">
-                                @await photo.ToHtml(Html, ViewData, language, timeZone, canDelete)
-                            </div>
+                            <div class="ui blue label">@LabelHelper.TranslateTag(label)</div>
                         }
-                    </div>
-                    @if (isMobile)
-                    {
-                        <br/>
                     }
                 }
-                else
-                {
-                    <p>This level has no photos yet.</p>
-                }
-
             </div>
         </div>
-        <div class="lh-content" id="lh-reviews">
-            @await Html.PartialAsync("Partials/ReviewPartial", new ViewDataDictionary(ViewData)
-                   {
-                       {
-                           "isMobile", isMobile
-                       },
-                       {
-                           "CanDelete", Model.User?.IsModerator ?? false
-                       },
-                   })
+        @if (isMobile)
+        {
+            <br/>
+        }
+    </div>
+
+    <div class="ui grid">
+        @{
+            string outerDiv = isMobile ? "horizontal-scroll" : "three wide column";
+            string innerDiv = isMobile ? "ui top attached tabular menu horizontal-scroll" : "ui vertical fluid tabular menu";
+        }
+        <div class="@outerDiv">
+            <div class="@innerDiv">
+                <a class="item active lh-sidebar" target="lh-comments">
+                    Comments
+                </a>
+                <a class="item lh-sidebar" target="lh-photos">
+                    @Model.Translate(BaseLayoutStrings.HeaderPhotos)
+                </a>
+                <a class="item lh-sidebar" target="lh-reviews">
+                    Reviews
+                </a>
+                <a class="item lh-sidebar" target="lh-scores">
+                    Scores
+                </a>
+            </div>
         </div>
-        <div class="lh-content" id="lh-scores">
-            <div class="eight wide column">
-                @await Html.PartialAsync("Partials/LeaderboardPartial", 
-                           ViewData.WithLang(language).WithTime(timeZone).CanDelete(Model.User?.IsModerator ?? false))
+
+        @{
+            string divLength = isMobile ? "sixteen" : "thirteen";
+        }
+        <div class="@divLength wide stretched column">
+            <div class="lh-content" id="lh-comments">
+                @await Html.PartialAsync("Partials/CommentsPartial", new ViewDataDictionary(ViewData.WithLang(language).WithTime(timeZone))
+                       {
+                           {
+                               "PageOwner", Model.Slot?.CreatorId
+                           },
+                       })
+            </div>
+            <div class="lh-content" id="lh-photos">
+                <div class="ui purple segment" id="photos">
+                    @if (Model.Photos.Count != 0)
+                    {
+                        <div class="ui center aligned grid">
+                            @foreach (PhotoEntity photo in Model.Photos)
+                            {
+                                string width = isMobile ? "sixteen" : "eight";
+                                bool canDelete = Model.User != null && (Model.User.IsModerator || Model.User.UserId == photo.CreatorId);
+                                <div class="@width wide column">
+                                    @await photo.ToHtml(Html, ViewData, language, timeZone, canDelete)
+                                </div>
+                            }
+                        </div>
+                        @if (isMobile)
+                        {
+                            <br/>
+                        }
+                    }
+                    else
+                    {
+                        <p>This level has no photos yet.</p>
+                    }
+
+                </div>
+            </div>
+            <div class="lh-content" id="lh-reviews">
+                @await Html.PartialAsync("Partials/ReviewPartial", new ViewDataDictionary(ViewData)
+                       {
+                           {
+                               "isMobile", isMobile
+                           },
+                           {
+                               "CanDelete", Model.User?.IsModerator ?? false
+                           },
+                       })
+            </div>
+            <div class="lh-content" id="lh-scores">
+                <div class="eight wide column">
+                    @await Html.PartialAsync("Partials/LeaderboardPartial", ViewData.WithLang(language).WithTime(timeZone).CanDelete(Model.User?.IsModerator ?? false))
+                </div>
             </div>
         </div>
     </div>
-</div>
+}
 
     @if (isMobile)
     {
@@ -203,6 +234,16 @@
                 <div class="ui yellow button">
                     <i class="lock icon"></i>
                     <span>Hide</span>
+                </div>
+            </a>
+        }
+        
+        @if (!Model.Slot!.InitiallyLocked && !Model.Slot!.LockedByModerator)
+        {
+            <a href="/moderation/newCase?type=@((int)CaseType.LevelLock)&affectedId=@Model.Slot?.SlotId">
+                <div class="ui yellow button">
+                    <i class="lock icon"></i>
+                    <span>Forcibly Lock Level</span>
                 </div>
             </a>
         }

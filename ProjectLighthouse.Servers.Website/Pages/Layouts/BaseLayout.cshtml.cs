@@ -29,10 +29,12 @@ public class BaseLayout : PageModel
     public BaseLayout(DatabaseContext database)
     {
         this.Database = database;
-        
+
         this.NavigationItems.Add(new PageNavigationItem(BaseLayoutStrings.HeaderUsers, "/users/0", "user friends"));
         this.NavigationItems.Add(new PageNavigationItem(BaseLayoutStrings.HeaderPhotos, "/photos/0", "camera"));
         this.NavigationItems.Add(new PageNavigationItem(BaseLayoutStrings.HeaderSlots, "/slots/0", "globe americas"));
+        
+        this.NavigationItemsRight.Add(new PageNavigationItem(GeneralStrings.Announcements, "/announce", "bullhorn"));
     }
 
     public new UserEntity? User {

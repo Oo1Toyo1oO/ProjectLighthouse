@@ -8,17 +8,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="JetBrains.Annotations" Version="2022.3.1" />
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="7.0.5" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.5">
+        <PackageReference Include="JetBrains.Annotations" Version="2023.2.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="7.0.11" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.11">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
-        <PackageReference Include="Selenium.WebDriver" Version="4.9.1" />
-        <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="113.0.5672.6300" />
-        <PackageReference Include="xunit" Version="2.4.2" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.7.2" />
+        <PackageReference Include="Selenium.WebDriver" Version="4.13.1" />
+        <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="117.0.5938.9200" />
+        <PackageReference Include="xunit" Version="2.5.1" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.5.1">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
@@ -32,6 +32,7 @@
         <ProjectReference Include="..\ProjectLighthouse.Servers.Website\ProjectLighthouse.Servers.Website.csproj" />
         <ProjectReference Include="..\ProjectLighthouse.Tests\ProjectLighthouse.Tests.csproj" />
         <ProjectReference Include="..\ProjectLighthouse\ProjectLighthouse.csproj" />
+        <ProjectReference Include="..\ProjectLighthouse.Localization\ProjectLighthouse.Localization.csproj"/>
     </ItemGroup>
 
 </Project>

@@ -16,7 +16,7 @@ namespace ProjectLighthouse.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.4")
+                .HasAnnotation("ProductVersion", "7.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Interaction.HeartedLevelEntity", b =>
@@ -321,21 +321,26 @@ namespace ProjectLighthouse.Migrations
                     b.Property<int>("ChildSlotId")
                         .HasColumnType("int");
 
-                    b.Property<string>("PlayerIdCollection")
-                        .HasColumnType("longtext");
-
                     b.Property<int>("Points")
                         .HasColumnType("int");
 
                     b.Property<int>("SlotId")
                         .HasColumnType("int");
 
+                    b.Property<long>("Timestamp")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("ScoreId");
 
                     b.HasIndex("SlotId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Scores");
                 });
@@ -405,6 +410,13 @@ namespace ProjectLighthouse.Migrations
 
                     b.Property<ulong>("LocationPacked")
                         .HasColumnType("bigint unsigned");
+
+                    b.Property<bool>("LockedByModerator")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("LockedReason")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<int>("MaximumPlayers")
                         .HasColumnType("int");
@@ -628,7 +640,10 @@ namespace ProjectLighthouse.Migrations
                     b.Property<int>("PosterUserId")
                         .HasColumnType("int");
 
-                    b.Property<int>("TargetId")
+                    b.Property<int?>("TargetSlotId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TargetUserId")
                         .HasColumnType("int");
 
                     b.Property<int>("ThumbsDown")
@@ -646,6 +661,10 @@ namespace ProjectLighthouse.Migrations
                     b.HasKey("CommentId");
 
                     b.HasIndex("PosterUserId");
+
+                    b.HasIndex("TargetSlotId");
+
+                    b.HasIndex("TargetUserId");
 
                     b.ToTable("Comments");
                 });
@@ -839,6 +858,9 @@ namespace ProjectLighthouse.Migrations
                     b.Property<string>("PlanetHashLBPVita")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("ProfileTag")
+                        .HasColumnType("longtext");
+
                     b.Property<int>("ProfileVisibility")
                         .HasColumnType("int");
 
@@ -1022,6 +1044,28 @@ namespace ProjectLighthouse.Migrations
                     b.HasKey("TokenId");
 
                     b.ToTable("WebTokens");
+                });
+
+            modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Website.WebsiteAnnouncementEntity", b =>
+                {
+                    b.Property<int>("AnnouncementId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("PublisherId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("AnnouncementId");
+
+                    b.HasIndex("PublisherId");
+
+                    b.ToTable("WebsiteAnnouncements");
                 });
 
             modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Interaction.HeartedLevelEntity", b =>
@@ -1214,7 +1258,15 @@ namespace ProjectLighthouse.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("LBPUnion.ProjectLighthouse.Types.Entities.Profile.UserEntity", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Slot");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Level.SlotEntity", b =>
@@ -1283,7 +1335,19 @@ namespace ProjectLighthouse.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("LBPUnion.ProjectLighthouse.Types.Entities.Level.SlotEntity", "TargetSlot")
+                        .WithMany()
+                        .HasForeignKey("TargetSlotId");
+
+                    b.HasOne("LBPUnion.ProjectLighthouse.Types.Entities.Profile.UserEntity", "TargetUser")
+                        .WithMany()
+                        .HasForeignKey("TargetUserId");
+
                     b.Navigation("Poster");
+
+                    b.Navigation("TargetSlot");
+
+                    b.Navigation("TargetUser");
                 });
 
             modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Profile.LastContactEntity", b =>
@@ -1375,6 +1439,15 @@ namespace ProjectLighthouse.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Website.WebsiteAnnouncementEntity", b =>
+                {
+                    b.HasOne("LBPUnion.ProjectLighthouse.Types.Entities.Profile.UserEntity", "Publisher")
+                        .WithMany()
+                        .HasForeignKey("PublisherId");
+
+                    b.Navigation("Publisher");
                 });
 
             modelBuilder.Entity("LBPUnion.ProjectLighthouse.Types.Entities.Profile.PhotoEntity", b =>

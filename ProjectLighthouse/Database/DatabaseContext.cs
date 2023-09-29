@@ -5,6 +5,7 @@ using LBPUnion.ProjectLighthouse.Types.Entities.Maintenance;
 using LBPUnion.ProjectLighthouse.Types.Entities.Moderation;
 using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
 using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Entities.Website;
 using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Database;
@@ -61,8 +62,16 @@ public partial class DatabaseContext : DbContext
     #region Misc
     public DbSet<CompletedMigrationEntity> CompletedMigrations { get; set; }
     #endregion
+    
+    #region Website
+    public DbSet<WebsiteAnnouncementEntity> WebsiteAnnouncements { get; set; }
+    #endregion
 
     #endregion
+
+    // Used for mocking DbContext
+    protected internal DatabaseContext()
+    { }
 
     public DatabaseContext(DbContextOptions<DatabaseContext> options) : base(options)
     { }

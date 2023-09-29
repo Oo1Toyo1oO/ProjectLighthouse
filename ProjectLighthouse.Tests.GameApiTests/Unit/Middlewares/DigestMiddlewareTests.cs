@@ -16,7 +16,7 @@ public class DigestMiddlewareTests
 {
 
     [Fact]
-    public async void DigestMiddleware_ShouldNotComputeDigests_WhenDigestsDisabled()
+    public async Task DigestMiddleware_ShouldNotComputeDigests_WhenDigestsDisabled()
     {
         DefaultHttpContext context = new()
         {
@@ -39,12 +39,12 @@ public class DigestMiddlewareTests
         const int expectedCode = 200;
 
         Assert.Equal(expectedCode, context.Response.StatusCode);
-        Assert.Empty(context.Response.Headers["X-Digest-A"]);
-        Assert.Empty(context.Response.Headers["X-Digest-B"]);
+        Assert.False(context.Response.Headers.TryGetValue("X-Digest-A", out _));
+        Assert.False(context.Response.Headers.TryGetValue("X-Digest-B", out _));
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldReject_WhenDigestHeaderIsMissing()
+    public async Task DigestMiddleware_ShouldReject_WhenDigestHeaderIsMissing()
     {
         DefaultHttpContext context = new()
         {
@@ -72,12 +72,12 @@ public class DigestMiddlewareTests
         const int expectedCode = 403;
 
         Assert.Equal(expectedCode, context.Response.StatusCode);
-        Assert.Empty(context.Response.Headers["X-Digest-A"]);
-        Assert.Empty(context.Response.Headers["X-Digest-B"]);
+        Assert.False(context.Response.Headers.TryGetValue("X-Digest-A", out _));
+        Assert.False(context.Response.Headers.TryGetValue("X-Digest-B", out _));
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldReject_WhenRequestDigestInvalid()
+    public async Task DigestMiddleware_ShouldReject_WhenRequestDigestInvalid()
     {
         DefaultHttpContext context = new()
         {
@@ -107,12 +107,12 @@ public class DigestMiddlewareTests
         const int expectedCode = 403;
 
         Assert.Equal(expectedCode, context.Response.StatusCode);
-        Assert.Empty(context.Response.Headers["X-Digest-A"]);
-        Assert.Empty(context.Response.Headers["X-Digest-B"]);
+        Assert.False(context.Response.Headers.TryGetValue("X-Digest-A", out _));
+        Assert.False(context.Response.Headers.TryGetValue("X-Digest-B", out _));
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldUseAlternateDigest_WhenPrimaryDigestInvalid()
+    public async Task DigestMiddleware_ShouldUseAlternateDigest_WhenPrimaryDigestInvalid()
     {
         DefaultHttpContext context = new()
         {
@@ -150,8 +150,8 @@ public class DigestMiddlewareTests
         Assert.Equal(expectedClientDigest, context.Response.Headers["X-Digest-B"][0]);
     }
 
-[Fact]
-    public async void DigestMiddleware_ShouldNotReject_WhenRequestingAnnounce()
+    [Fact]
+    public async Task DigestMiddleware_ShouldNotReject_WhenRequestingAnnounce()
     {
         DefaultHttpContext context = new()
         {
@@ -188,7 +188,7 @@ public class DigestMiddlewareTests
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldCalculate_WhenAuthCookieEmpty()
+    public async Task DigestMiddleware_ShouldCalculate_WhenAuthCookieEmpty()
     {
         DefaultHttpContext context = new()
         {
@@ -225,7 +225,7 @@ public class DigestMiddlewareTests
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldComputeDigestsWithNoBody_WhenDigestsEnabled()
+    public async Task DigestMiddleware_ShouldComputeDigestsWithNoBody_WhenDigestsEnabled()
     {
         DefaultHttpContext context = new()
         {
@@ -263,7 +263,7 @@ public class DigestMiddlewareTests
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldComputeDigestsWithBody_WhenDigestsEnabled_AndNoResponseBody()
+    public async Task DigestMiddleware_ShouldComputeDigestsWithBody_WhenDigestsEnabled_AndNoResponseBody()
     {
         DefaultHttpContext context = new()
         {
@@ -301,7 +301,7 @@ public class DigestMiddlewareTests
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldComputeDigestsWithBody_WhenDigestsEnabled_AndResponseBody()
+    public async Task DigestMiddleware_ShouldComputeDigestsWithBody_WhenDigestsEnabled_AndResponseBody()
     {
         DefaultHttpContext context = new()
         {
@@ -339,7 +339,7 @@ public class DigestMiddlewareTests
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldComputeDigestsWithBody_WhenUploading()
+    public async Task DigestMiddleware_ShouldComputeDigestsWithBody_WhenUploading()
     {
         DefaultHttpContext context = new()
         {
@@ -377,7 +377,7 @@ public class DigestMiddlewareTests
     }
 
     [Fact]
-    public async void DigestMiddleware_ShouldCompressResponse_WhenAcceptEncodingHeaderIsPresent()
+    public async Task DigestMiddleware_ShouldCompressResponse_WhenAcceptEncodingHeaderIsPresent()
     {
         DefaultHttpContext context = new()
         {

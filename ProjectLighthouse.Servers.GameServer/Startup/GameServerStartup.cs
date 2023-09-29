@@ -1,4 +1,5 @@
 using System.Net;
+using LBPUnion.ProjectLighthouse.Administration.Maintenance;
 using LBPUnion.ProjectLighthouse.Configuration;
 using LBPUnion.ProjectLighthouse.Database;
 using LBPUnion.ProjectLighthouse.Logging;
@@ -6,6 +7,7 @@ using LBPUnion.ProjectLighthouse.Mail;
 using LBPUnion.ProjectLighthouse.Middlewares;
 using LBPUnion.ProjectLighthouse.Serialization;
 using LBPUnion.ProjectLighthouse.Servers.GameServer.Middlewares;
+using LBPUnion.ProjectLighthouse.Services;
 using LBPUnion.ProjectLighthouse.Types.Logging;
 using LBPUnion.ProjectLighthouse.Types.Mail;
 using Microsoft.AspNetCore.Authorization;
@@ -63,6 +65,8 @@ public class GameServerStartup
             : new NullMailService();
         services.AddSingleton(mailService);
 
+        services.AddHostedService(provider => new RepeatingTaskService(provider, MaintenanceHelper.RepeatingTasks));
+
         services.Configure<ForwardedHeadersOptions>
         (
             options =>
@@ -109,6 +113,5 @@ public class GameServerStartup
         app.UseAuthorization();
 
         app.UseEndpoints(endpoints => endpoints.MapControllers());
-        app.UseEndpoints(endpoints => endpoints.MapRazorPages());
     }
 }

@@ -22,6 +22,8 @@ public class SlotPage : BaseLayout
     public bool CommentsEnabled;
     public readonly bool ReviewsEnabled = ServerConfiguration.Instance.UserGeneratedContentLimits.LevelReviewsEnabled;
 
+    public bool CanViewSlot;
+
     public SlotEntity? Slot;
     public SlotPage(DatabaseContext database) : base(database)
     {}
@@ -29,32 +31,16 @@ public class SlotPage : BaseLayout
     public async Task<IActionResult> OnGet([FromRoute] int id)
     {
         SlotEntity? slot = await this.Database.Slots.Include(s => s.Creator)
-            .Where(s => s.Type == SlotType.User)
+            .Where(s => s.Type == SlotType.User || (this.User != null && this.User.PermissionLevel >= PermissionLevel.Moderator))
             .FirstOrDefaultAsync(s => s.SlotId == id);
         if (slot == null) return this.NotFound();
         System.Diagnostics.Debug.Assert(slot.Creator != null);
 
+        bool isAuthenticated = this.User != null;
+        bool isOwner = slot.Creator == this.User || this.User != null && this.User.IsModerator;
+        
         // Determine if user can view slot according to creator's privacy settings
-        if (this.User == null || !this.User.IsAdmin)
-        {
-            switch (slot.Creator.ProfileVisibility)
-            {
-                case PrivacyType.PSN:
-                {
-                    if (this.User != null) return this.NotFound();
-
-                    break;
-                }
-                case PrivacyType.Game:
-                {
-                    if (this.User == null || slot.Creator != this.User) return this.NotFound();
-
-                    break;
-                }
-                case PrivacyType.All: break;
-                default: throw new ArgumentOutOfRangeException();
-            }
-        }
+        this.CanViewSlot = slot.Creator.LevelVisibility.CanAccess(isAuthenticated, isOwner);
 
         if ((slot.Hidden || slot.SubLevel && (this.User == null && this.User != slot.Creator)) && !(this.User?.IsModerator ?? false))
             return this.NotFound();
@@ -71,9 +57,9 @@ public class SlotPage : BaseLayout
         this.CommentsEnabled = ServerConfiguration.Instance.UserGeneratedContentLimits.LevelCommentsEnabled && this.Slot.CommentsEnabled;
         if (this.CommentsEnabled)
         {
-            this.Comments = await this.Database.Comments.Include(p => p.Poster)
-                .OrderByDescending(p => p.Timestamp)
-                .Where(c => c.TargetId == id && c.Type == CommentType.Level)
+            this.Comments = await this.Database.Comments.Include(c => c.Poster)
+                .OrderByDescending(c => c.Timestamp)
+                .Where(c => c.Type == CommentType.Level && c.TargetSlotId == id)
                 .Where(c => !blockedUsers.Contains(c.PosterUserId))
                 .Include(c => c.Poster)
                 .Where(c => c.Poster.PermissionLevel != PermissionLevel.Banned)
