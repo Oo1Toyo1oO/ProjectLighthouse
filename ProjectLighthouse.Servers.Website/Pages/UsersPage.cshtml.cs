@@ -30,14 +30,15 @@ public class UsersPage : BaseLayout
 
         this.SearchValue = name.Replace(" ", string.Empty);
 
-        this.UserCount = await this.Database.Users.CountAsync(u => u.PermissionLevel != PermissionLevel.Banned && u.Username.Contains(this.SearchValue));
+        this.UserCount = await this.Database.Users.CountAsync(u => !u.Username.Contains(".") && u.PermissionLevel != PermissionLevel.Banned && u.Username.Contains(this.SearchValue));
 
         this.PageNumber = pageNumber;
         this.PageAmount = Math.Max(1, (int)Math.Ceiling((double)this.UserCount / ServerStatics.PageSize));
 
         if (this.PageNumber < 0 || this.PageNumber >= this.PageAmount) return this.Redirect($"/users/{Math.Clamp(this.PageNumber, 0, this.PageAmount - 1)}");
 
-        this.Users = await this.Database.Users.Where(u => u.Username.Contains(this.SearchValue))
+        this.Users = await this.Database.Users.Where(u => !u.Username.Contains("."))
+			.Where(u => u.Username.Contains(this.SearchValue))
             .Where(u => u.PermissionLevel != PermissionLevel.Banned)
             .OrderByDescending(b => b.UserId)
             .Skip(pageNumber * ServerStatics.PageSize)
