@@ -1,6 +1,5 @@
 #nullable enable
 using System.Text;
-using LBPUnion.ProjectLighthouse.Configuration;
 using LBPUnion.ProjectLighthouse.Extensions;
 using LBPUnion.ProjectLighthouse.Files;
 using LBPUnion.ProjectLighthouse.Logging;
@@ -59,14 +58,10 @@ public class ResourcesController : ControllerBase
         string fullPath = Path.GetFullPath(path);
 
         FileHelper.EnsureDirectoryCreated(assetsDirectory);
-
-        // Deny request if in read-only mode
-        if (ServerConfiguration.Instance.UserGeneratedContentLimits.ReadOnlyMode) return this.BadRequest();
-
-        // LBP treats code 409 as success and as an indicator that the file is already present
+        // lbp treats code 409 as success and as an indicator that the file is already present
         if (FileHelper.ResourceExists(hash)) return this.Conflict();
 
-        // Theoretically shouldn't be possible because of hash check but handle anyways
+        // theoretically shouldn't be possible because of hash check but handle anyways
         if (!fullPath.StartsWith(FileHelper.FullResourcePath)) return this.BadRequest();
 
         Logger.Info($"Processing resource upload (hash: {hash})", LogArea.Resources);
