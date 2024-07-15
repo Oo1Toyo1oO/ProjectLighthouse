@@ -11,10 +11,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using IOFile = System.IO.File;
 
-// for archive.org resoruce getter 
-using System.IO;
-using System.Net.Http;
-// ^^^
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Controllers.Resources;
 
 [ApiController]
@@ -50,26 +46,8 @@ public class ResourcesController : ControllerBase
         if (!fullPath.StartsWith(FileHelper.FullResourcePath)) return this.BadRequest();
 
         if (FileHelper.ResourceExists(hash)) return this.File(IOFile.OpenRead(path), "application/octet-stream");
-		
-		// for archive.org resoruce getter 
-        string a = hash.Substring(0, 2);
-        string b = hash.Substring(2, 2);
-        string c = hash.Substring(0, 1);
-        string url = $"https://archive.org/download/dry23r{c}/dry{a}.zip/{a}/{b}/{hash}";
 
-        
-		using (HttpClient client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true }))
-		{
-			var response = client.GetAsync(url).Result;
-			if (response.IsSuccessStatusCode && response.Content.Headers.ContentType.MediaType == "application/octet-stream")
-			{
-				var stream = response.Content.ReadAsStreamAsync().Result;
-				return this.File(stream, "application/octet-stream");
-			}
-		}
-
-        // ^^^
-		return this.NotFound();
+        return this.NotFound();
     }
 
     [HttpPost("upload/{hash}/unattributed")]
