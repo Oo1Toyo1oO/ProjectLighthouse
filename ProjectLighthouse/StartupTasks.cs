@@ -210,9 +210,9 @@ continue;
 
             stopwatch.Restart();
 
-            List<string> completedMigrations = database.CompletedMigrations.Select(m => m.MigrationName).ToList();
+//            List<string> completedMigrations = database.CompletedMigrations.Select(m => m.MigrationName).ToList();
 
-            await RunLighthouseMigrations(m => !completedMigrations.Contains(m.GetType().Name) && m.HookType() == MigrationHook.None);
+//            await RunLighthouseMigrations(m => !completedMigrations.Contains(m.GetType().Name) && m.HookType() == MigrationHook.None);
 
             stopwatch.Stop();
             totalStopwatch.Stop();
