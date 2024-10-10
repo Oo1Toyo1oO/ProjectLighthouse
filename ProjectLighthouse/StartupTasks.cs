@@ -166,7 +166,6 @@ public static class StartupTasks
 
             stopwatch.Restart();
             List<string> pendingMigrations = (await database.Database.GetPendingMigrationsAsync()).ToList();
-            pendingMigrations.Clear();
             IMigrator migrator = database.GetInfrastructure().GetRequiredService<IMigrator>();
 
             async Task<bool> RunLighthouseMigrations(Func<MigrationTask, bool> predicate)
