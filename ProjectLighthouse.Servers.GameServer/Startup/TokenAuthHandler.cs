@@ -40,7 +40,7 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-                                if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
+                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
             Console.WriteLine("got to annocoment broo so something done messed up after me");
             }
         if (!this.Context.Request.Cookies.ContainsKey(cookie)) return AuthenticateResult.Fail("No auth cookie");
