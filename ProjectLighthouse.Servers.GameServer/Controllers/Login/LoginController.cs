@@ -48,7 +48,7 @@ public class LoginController : ControllerBase
             return this.BadRequest();
         }
 
-        IPAddress? remoteIpAddress = this.HttpContext.Connection.RemoteIpAddress;
+        IPAddress? remoteIpAddress = IPAddress.Parse(this.HttpContext.Request.Headers["CF-Connecting-IP"]); // this.HttpContext.Connection.RemoteIpAddress;
         if (remoteIpAddress == null)
         {
             Logger.Warn("unable to determine ip, rejecting login", LogArea.Login);

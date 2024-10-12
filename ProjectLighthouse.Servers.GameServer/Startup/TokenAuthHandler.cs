@@ -38,7 +38,7 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         GameTokenEntity? gameToken = await this.database.GameTokenFromRequest(this.Request);
         if (gameToken == null) return AuthenticateResult.Fail("No game token");
 
-        IPAddress? remoteIpAddress = this.Context.Connection.RemoteIpAddress;
+        IPAddress? remoteIpAddress = IPAddress.Parse(this.Context.Request.Headers["CF-Connecting-IP"]); // this.Context.Connection.RemoteIpAddress;
         if (remoteIpAddress == null) return AuthenticateResult.Fail("Failed to determine IP address");
 
         if (CryptoHelper.Sha256Hash(remoteIpAddress.ToString()) != gameToken.LocationHash)

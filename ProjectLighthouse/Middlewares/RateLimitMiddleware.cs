@@ -32,7 +32,7 @@ public class RateLimitMiddleware : Middleware
             await this.next(ctx);
             return;
         }
-        IPAddress? address = ctx.Connection.RemoteIpAddress;
+        IPAddress? address = IPAddress.Parse(ctx.Request.Headers["CF-Connecting-IP"]); // ctx.Connection.RemoteIpAddress;
         if (address == null)
         {
             await this.next(ctx);

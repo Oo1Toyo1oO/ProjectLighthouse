@@ -20,7 +20,7 @@ public class AuthenticationPage : BaseLayout
     {
         if (this.User == null) return this.Redirect("~/login");
 
-        this.IpAddress = this.HttpContext.Connection.RemoteIpAddress;
+        this.IpAddress = IPAddress.Parse(this.HttpContext.Request.Headers["CF-Connecting-IP"]); // this.HttpContext.Connection.RemoteIpAddress;
 
         this.LinkAttempts = this.Database.PlatformLinkAttempts
         .Where(l => l.UserId == this.User.UserId)
