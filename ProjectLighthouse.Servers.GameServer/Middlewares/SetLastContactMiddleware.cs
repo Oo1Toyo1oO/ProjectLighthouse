@@ -18,7 +18,7 @@ public class SetLastContactMiddleware : MiddlewareDBContext
         if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML"))
         {
             if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Logger.Warn("got to annocoment broo so something done messed up after me", LogArea.Login);
+            Logger.Warn("got to annocoment broo so something done messed up after me");
             }
             
             // We begin by grabbing a token from the request, if this is a LBPPS3_XML request of course.
