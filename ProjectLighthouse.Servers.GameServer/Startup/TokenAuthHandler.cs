@@ -62,7 +62,9 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
             }
         if (CryptoHelper.Sha256Hash(remoteIpAddress.ToString()) != gameToken.LocationHash)
             return AuthenticateResult.Fail("IP address change detected");
-
+                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
+            Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>> no ip changed deteceted");
+            }
         this.Context.Items["Token"] = gameToken;
         Claim[] claims =
         [
