@@ -8,6 +8,30 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+
+using System.Text;
+using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Extensions;
+using LBPUnion.ProjectLighthouse.Helpers;
+using LBPUnion.ProjectLighthouse.Localization;
+using LBPUnion.ProjectLighthouse.Localization.StringLists;
+using LBPUnion.ProjectLighthouse.Logging;
+using LBPUnion.ProjectLighthouse.Serialization;
+using LBPUnion.ProjectLighthouse.Types.Entities.Notifications;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Mail;
+using LBPUnion.ProjectLighthouse.Types.Serialization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+
+
+
+
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Startup;
 
 public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
@@ -33,6 +57,9 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+                                if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
+            Logger.Warn("got to annocoment broo so something done messed up after me", LogArea.Login);
+            }
         if (!this.Context.Request.Cookies.ContainsKey(cookie)) return AuthenticateResult.Fail("No auth cookie");
 
         GameTokenEntity? gameToken = await this.database.GameTokenFromRequest(this.Request);
