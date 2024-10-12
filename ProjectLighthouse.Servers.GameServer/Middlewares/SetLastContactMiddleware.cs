@@ -5,6 +5,26 @@ using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using LBPUnion.ProjectLighthouse.Types.Users;
 using LBPUnion.ProjectLighthouse.Types.Logging;
 
+
+using System.Text;
+using LBPUnion.ProjectLighthouse.Configuration;
+using LBPUnion.ProjectLighthouse.Database;
+using LBPUnion.ProjectLighthouse.Extensions;
+using LBPUnion.ProjectLighthouse.Helpers;
+using LBPUnion.ProjectLighthouse.Localization;
+using LBPUnion.ProjectLighthouse.Localization.StringLists;
+using LBPUnion.ProjectLighthouse.Logging;
+using LBPUnion.ProjectLighthouse.Serialization;
+using LBPUnion.ProjectLighthouse.Types.Entities.Notifications;
+using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
+using LBPUnion.ProjectLighthouse.Types.Entities.Token;
+using LBPUnion.ProjectLighthouse.Types.Logging;
+using LBPUnion.ProjectLighthouse.Types.Mail;
+using LBPUnion.ProjectLighthouse.Types.Serialization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Middlewares;
 
 public class SetLastContactMiddleware : MiddlewareDBContext
