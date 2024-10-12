@@ -17,6 +17,10 @@ public class SetLastContactMiddleware : MiddlewareDBContext
         // Log LastContact for LBP1. This is done on LBP2/3/V on a Match request.
         if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML"))
         {
+            if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
+            Logger.Warn("got to annocoment broo so something done messed up after me", LogArea.Login);
+            }
+            
             // We begin by grabbing a token from the request, if this is a LBPPS3_XML request of course.
             GameTokenEntity? gameToken = await database.GameTokenFromRequest(context.Request);
 
