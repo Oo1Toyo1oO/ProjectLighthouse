@@ -49,6 +49,12 @@ public class LoginController : ControllerBase
         }
 
         IPAddress? remoteIpAddress = this.HttpContext.Connection.RemoteIpAddress;
+
+                                if (this.HttpContext.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/login")) {
+            Console.WriteLine($"^^^^^^^^^^^^^^^^^^^^^^^ ip for login exists and ip is {remoteIpAddress.ToString()} ?");
+            }
+
+
         if (remoteIpAddress == null)
         {
             Logger.Warn("unable to determine ip, rejecting login", LogArea.Login);
