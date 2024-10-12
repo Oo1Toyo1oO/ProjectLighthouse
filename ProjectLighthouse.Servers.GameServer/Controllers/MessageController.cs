@@ -52,7 +52,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.";
     [HttpGet("announce")]
     public async Task<IActionResult> Announce()
     {
-        Logger.Warn("got to annocoment broo so something done messed up after me", LogArea.Login);
         GameTokenEntity token = this.GetToken();
 
         string username = await this.database.UsernameFromGameToken(token);
