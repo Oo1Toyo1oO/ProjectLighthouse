@@ -3,6 +3,7 @@ using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Middlewares;
 using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using LBPUnion.ProjectLighthouse.Types.Users;
+using LBPUnion.ProjectLighthouse.Types.Logging;
 
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Middlewares;
 
@@ -18,7 +19,7 @@ public class SetLastContactMiddleware : MiddlewareDBContext
         if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML"))
         {
             if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Logger<SetLastContactMiddleware>.Warn("got to annocoment broo so something done messed up after me");
+            Logger.Warn("got to annocoment broo so something done messed up after me", LogArea.Login);
             }
             
             // We begin by grabbing a token from the request, if this is a LBPPS3_XML request of course.
