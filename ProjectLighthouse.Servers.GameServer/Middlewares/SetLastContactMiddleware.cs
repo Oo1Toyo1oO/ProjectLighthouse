@@ -47,9 +47,7 @@ public class SetLastContactMiddleware : MiddlewareDBContext
 
             if (gameToken?.GameVersion == GameVersion.LittleBigPlanet1){
                 // Ignore UserFromGameToken null because user must exist for a token to exist
-                            if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Logger.Warn("got to annocoment broo so something done messed up after me", LogArea.Login);
-            }
+
                 await LastContactHelper.SetLastContact
                     (database, (await database.UserFromGameToken(gameToken))!, GameVersion.LittleBigPlanet1, gameToken.Platform);
         }
