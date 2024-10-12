@@ -8,13 +8,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
-
-
-
-
-
-
-
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Startup;
 
 public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
@@ -40,31 +33,17 @@ public class TokenAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>> got to annocoment broo so something done messed up after me");
-            }
         if (!this.Context.Request.Cookies.ContainsKey(cookie)) return AuthenticateResult.Fail("No auth cookie");
-                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>> cookie exists");
-            }
+
         GameTokenEntity? gameToken = await this.database.GameTokenFromRequest(this.Request);
         if (gameToken == null) return AuthenticateResult.Fail("No game token");
-                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>> game token exits");
-            }
+
         IPAddress? remoteIpAddress = this.Context.Connection.RemoteIpAddress;
-                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>> got someting for ip");
-            }
         if (remoteIpAddress == null) return AuthenticateResult.Fail("Failed to determine IP address");
-                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Console.WriteLine($">>>>>>>>>>>>>>>>>>>>>> ip exists and ip is {remoteIpAddress.ToString()} ?");
-            }
+
         if (CryptoHelper.Sha256Hash(remoteIpAddress.ToString()) != gameToken.LocationHash)
             return AuthenticateResult.Fail("IP address change detected");
-                                if (this.Context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML/announce")) {
-            Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>> no ip changed deteceted");
-            }
+
         this.Context.Items["Token"] = gameToken;
         Claim[] claims =
         [

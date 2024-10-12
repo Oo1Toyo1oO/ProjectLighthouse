@@ -184,7 +184,6 @@ public static class StartupTasks
 
             foreach (string migration in pendingMigrations)
             {
-
                 try
                 {
                     await using IDbContextTransaction transaction = await database.Database.BeginTransactionAsync();

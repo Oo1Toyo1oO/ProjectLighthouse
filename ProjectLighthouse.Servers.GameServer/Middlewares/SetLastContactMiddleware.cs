@@ -3,27 +3,6 @@ using LBPUnion.ProjectLighthouse.Helpers;
 using LBPUnion.ProjectLighthouse.Middlewares;
 using LBPUnion.ProjectLighthouse.Types.Entities.Token;
 using LBPUnion.ProjectLighthouse.Types.Users;
-using LBPUnion.ProjectLighthouse.Types.Logging;
-
-
-using System.Text;
-using LBPUnion.ProjectLighthouse.Configuration;
-using LBPUnion.ProjectLighthouse.Database;
-using LBPUnion.ProjectLighthouse.Extensions;
-using LBPUnion.ProjectLighthouse.Helpers;
-using LBPUnion.ProjectLighthouse.Localization;
-using LBPUnion.ProjectLighthouse.Localization.StringLists;
-using LBPUnion.ProjectLighthouse.Logging;
-using LBPUnion.ProjectLighthouse.Serialization;
-using LBPUnion.ProjectLighthouse.Types.Entities.Notifications;
-using LBPUnion.ProjectLighthouse.Types.Entities.Profile;
-using LBPUnion.ProjectLighthouse.Types.Entities.Token;
-using LBPUnion.ProjectLighthouse.Types.Logging;
-using LBPUnion.ProjectLighthouse.Types.Mail;
-using LBPUnion.ProjectLighthouse.Types.Serialization;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LBPUnion.ProjectLighthouse.Servers.GameServer.Middlewares;
 
@@ -38,19 +17,13 @@ public class SetLastContactMiddleware : MiddlewareDBContext
         // Log LastContact for LBP1. This is done on LBP2/3/V on a Match request.
         if (context.Request.Path.ToString().StartsWith("/LITTLEBIGPLANETPS3_XML"))
         {
-
-            
             // We begin by grabbing a token from the request, if this is a LBPPS3_XML request of course.
             GameTokenEntity? gameToken = await database.GameTokenFromRequest(context.Request);
-            
 
-
-            if (gameToken?.GameVersion == GameVersion.LittleBigPlanet1){
+            if (gameToken?.GameVersion == GameVersion.LittleBigPlanet1)
                 // Ignore UserFromGameToken null because user must exist for a token to exist
-
                 await LastContactHelper.SetLastContact
                     (database, (await database.UserFromGameToken(gameToken))!, GameVersion.LittleBigPlanet1, gameToken.Platform);
-        }
         }
         #nullable disable
 
