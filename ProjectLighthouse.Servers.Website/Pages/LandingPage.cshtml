@@ -18,7 +18,7 @@
 <h1 class="lighthouse-welcome lighthouse-title">
     @Model.Translate(LandingPageStrings.Welcome, ServerConfiguration.Instance.Customization.ServerName)
 </h1>
-
+ 
 @if (Model.User != null)
 {
     <p>@Model.Translate(LandingPageStrings.LoggedInAs, Model.User.Username)</p>
