@@ -3,11 +3,16 @@
 @using LBPUnion.ProjectLighthouse.Extensions
 @using LBPUnion.ProjectLighthouse.Localization.StringLists
 @using LBPUnion.ProjectLighthouse.Servers.Website.Types
+@using LBPUnion.ProjectLighthouse.Servers.Website.Extensions
+@using LBPUnion.ProjectLighthouse.Types.Entities.Profile
 @model LBPUnion.ProjectLighthouse.Servers.Website.Pages.Moderation.ModPanelPage
 
 @{
     Layout = "Layouts/BaseLayout";
     Model.Title = Model.Translate(ModPanelStrings.ModPanelTitle);
+
+    string language = Model.GetLanguage();
+    string timeZone = Model.GetTimeZone();
 
     if (Model.User == null) throw new ArgumentNullException($"{nameof(Model)}.{nameof(User)}");
 
@@ -17,11 +22,38 @@
         if (Debugger.IsAttached) Debugger.Break();
         throw new Exception("Tried to render mod panel with user whose not mod somehow???");
     }
+
 }
 
 <p>@Model.Translate(ModPanelStrings.Greeting, Model.User.Username)</p>
 
+@switch (Model.PlayersOnline.Count)
+{
+    case 0:
+        <p>@Model.Translate(LandingPageStrings.UsersNone)</p>
+        break;
+    case 1:
+        <p>@Model.Translate(LandingPageStrings.UsersSingle)</p>
+        break;
+    default:
+        <p>@Model.Translate(LandingPageStrings.UsersMultiple, Model.PlayersOnline.Count)</p>
+        break;
+}
 
+
+@{
+    int i = 0;
+    foreach (UserEntity user in Model.PlayersOnline)
+    {
+        i++;
+        @await user.ToLink(Html, ViewData, language, timeZone, true)
+        @* whitespace has forced my hand *@
+        if (i != Model.PlayersOnline.Count)
+        {
+            <span>,</span>
+        }
+    }
+}
 
 @if (!this.Request.IsMobile())
 {
